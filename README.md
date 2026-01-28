@@ -1,6 +1,6 @@
 # win26-Team22
 
-# taralyn nguyen
+# taralyn nguyen (redo)
 # jessica cao 
 
 # varsha saravanan
