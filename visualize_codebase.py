@@ -25,6 +25,11 @@ from pathlib import Path
 from collections import defaultdict
 from typing import Dict, List, Set, Tuple, Optional
 import hashlib
+import http.server
+import socketserver
+import threading
+import time
+import socket
 
 # File extensions we care about
 CODE_EXTENSIONS = {
@@ -1593,9 +1598,67 @@ def generate_html(data: dict) -> str:
     return html
 
 
+def create_handler(html_content):
+    """Create a custom HTTP handler class with the HTML content."""
+    class VisualizationHandler(http.server.SimpleHTTPRequestHandler):
+        """Custom HTTP handler to serve the visualization HTML."""
+        
+        def do_GET(self):
+            if self.path == '/' or self.path == '/index.html':
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html; charset=utf-8')
+                content_bytes = html_content.encode('utf-8')
+                self.send_header('Content-Length', str(len(content_bytes)))
+                self.end_headers()
+                self.wfile.write(content_bytes)
+            else:
+                self.send_response(404)
+                self.end_headers()
+        
+        def log_message(self, format, *args):
+            # Suppress default logging
+            pass
+    
+    return VisualizationHandler
+
+
+def get_local_ip():
+    """Get the local IP address for network access."""
+    try:
+        # Connect to a remote address to determine local IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return None
+
+
+def start_server(html_content, port=8000):
+    """Start a local web server to serve the visualization."""
+    handler_class = create_handler(html_content)
+    
+    # Bind to 0.0.0.0 to allow network access
+    with socketserver.TCPServer(("0.0.0.0", port), handler_class) as httpd:
+        local_ip = get_local_ip()
+        print(f"🌐 Server running!")
+        print(f"   Local:  http://localhost:{port}/")
+        if local_ip:
+            print(f"   Network: http://{local_ip}:{port}/")
+            print(f"   Share this link with others on your network!")
+        print(f"   Press Ctrl+C to stop the server")
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("\n🛑 Server stopped.")
+
+
 def main():
     parser = argparse.ArgumentParser(description='Visualize codebase structure')
     parser.add_argument('path', nargs='?', default='.', help='Path to repository')
+    parser.add_argument('--output', '-o', type=str, help='Save HTML to file instead of starting server (for deployment)')
+    parser.add_argument('--no-server', action='store_true', help='Only generate HTML file, do not start server')
     args = parser.parse_args()
     
     repo_path = Path(args.path).resolve()
@@ -1617,20 +1680,59 @@ def main():
     print("🎨 Generating visualization...")
     html = generate_html(data)
     
-    # Write to temp file and open
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as f:
-        f.write(html)
-        temp_path = f.name
+    # Save to file if output path is specified
+    if args.output:
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(html)
+        print(f"✅ HTML saved to: {output_path.absolute()}")
+        print(f"   You can now deploy this file to GitHub Pages, Vercel, or any static hosting!")
+        if not args.no_server:
+            print(f"   (Also starting local server below)")
+        else:
+            return 0
+    
+    # Start server unless --no-server is specified
+    if args.no_server:
+        print("ℹ️  Use --output to save HTML file for deployment")
+        return 0
+    
+    port = 8000
+    server_thread = threading.Thread(target=start_server, args=(html, port), daemon=True)
+    server_thread.start()
+    
+    # Give server a moment to start
+    time.sleep(1)
+    
+    local_url = f'http://localhost:{port}/'
+    local_ip = get_local_ip()
+    network_url = f'http://{local_ip}:{port}/' if local_ip else None
     
     print(f"📊 Opening visualization in browser...")
-    print(f"   (File: {temp_path})")
-    webbrowser.open(f'file://{temp_path}')
+    print(f"   Local URL: {local_url}")
+    if network_url:
+        print(f"   Network URL: {network_url}")
+        print(f"   Share the network URL with others on your network!")
+    webbrowser.open(local_url)
     
-    print("\n✨ Done! Explore your codebase visually.")
+    print("\n✨ Server is running! Explore your codebase visually.")
     print("   - Click nodes to see dependency edges")
     print("   - Check Hotspots panel for most important files")
     print("   - Use Size/Color controls to visualize metrics")
-    return 0
+    print(f"\n🌐 Access the visualization at:")
+    print(f"   Local:  {local_url}")
+    if network_url:
+        print(f"   Network: {network_url}")
+    print("   Press Ctrl+C to stop the server")
+    
+    # Keep the main thread alive
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n🛑 Shutting down...")
+        return 0
 
 
 if __name__ == '__main__':
