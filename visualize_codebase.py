@@ -497,7 +497,7 @@ def generate_html(data: dict) -> str:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Codebase Explorer - ''' + data['rootName'] + '''</title>
+    <title>Codescape - ''' + data['rootName'] + '''</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
@@ -616,56 +616,58 @@ def generate_html(data: dict) -> str:
             position: fixed;
             top: 60px;
             left: 0;
-            right: 0;
+            right: 380px;
             bottom: 0;
         }
 
-        .modal-overlay {
-            display: none;
+        #sidebar {
             position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.6);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        .modal-overlay.visible {
-            display: flex;
-        }
-        .modal-content {
-            position: relative;
-            max-width: 480px;
-            width: 100%;
-            max-height: 85vh;
+            top: 60px;
+            right: 0;
+            width: 380px;
+            bottom: 0;
+            background: rgba(15, 15, 25, 0.98);
+            border-left: 1px solid rgba(100, 100, 150, 0.2);
             overflow-y: auto;
-            background: rgba(18, 18, 28, 0.98);
-            border: 1px solid rgba(100, 100, 150, 0.25);
-            border-radius: 16px;
-            padding: 24px;
-            box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+            padding: 16px;
         }
-        .modal-close {
-            position: absolute;
-            top: 16px;
-            right: 16px;
-            width: 32px;
-            height: 32px;
+        .sidebar-section {
+            margin-bottom: 20px;
+        }
+        .sidebar-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .card-remove {
+            width: 24px;
+            height: 24px;
             border: none;
             background: rgba(100, 100, 150, 0.2);
-            color: #888;
-            font-size: 20px;
+            color: #666;
+            font-size: 16px;
             line-height: 1;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             padding: 0;
+            flex-shrink: 0;
         }
-        .modal-close:hover {
-            background: rgba(100, 100, 150, 0.35);
-            color: #e0e0e0;
+        .card-remove:hover {
+            background: rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+        .details-placeholder {
+            color: #444;
+            font-style: italic;
+            padding: 24px 16px;
+            text-align: center;
+            font-size: 13px;
         }
         
         .file-info {
@@ -950,7 +952,7 @@ def generate_html(data: dict) -> str:
         #help {
             position: fixed;
             bottom: 20px;
-            right: 20px;
+            right: 400px;
             background: rgba(15, 15, 25, 0.95);
             padding: 12px 16px;
             border-radius: 12px;
@@ -986,7 +988,7 @@ def generate_html(data: dict) -> str:
 </head>
 <body>
     <div id="header">
-        <h1>⬡ Codebase Explorer</h1>
+        <h1>⬡ Codescape</h1>
         <div class="stats">
             <div class="stat">
                 <span>Files:</span>
@@ -1002,13 +1004,31 @@ def generate_html(data: dict) -> str:
             </div>
         </div>
         <div class="breadcrumb" id="breadcrumb">
-            <span class="breadcrumb-item" onclick="navigateTo('')">''' + data['rootName'] + '''</span>
+            <span class="breadcrumb-item" onclick="navigateTo('', true)">''' + data['rootName'] + '''</span>
         </div>
     </div>
     
     <div id="graph-container">
         <svg id="graph">
             <defs>
+                <linearGradient id="folderSilverGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#e8eef4;stop-opacity:1" />
+                    <stop offset="40%" style="stop-color:#c8d4e0;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#a0b0c4;stop-opacity:1" />
+                </linearGradient>
+                <filter id="folder-glow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur in="SourceAlpha" stdDeviation="1.5" result="blur"/>
+                    <feOffset in="blur" dx="0" dy="0" result="offsetBlur"/>
+                    <feFlood flood-color="#ffffff" flood-opacity="0.7" result="color"/>
+                    <feComposite in="color" in2="offsetBlur" operator="in" result="glow"/>
+                    <feMerge>
+                        <feMergeNode in="glow"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+                <symbol id="folder-icon" viewBox="0 0 24 24">
+                    <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" fill="url(#folderSilverGrad)" filter="url(#folder-glow)"/>
+                </symbol>
                 <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
                     <polygon points="0 0, 10 3.5, 0 7" fill="#7c3aed" opacity="0.6"/>
                 </marker>
@@ -1022,10 +1042,9 @@ def generate_html(data: dict) -> str:
         </svg>
     </div>
     
-    <div id="file-modal" class="modal-overlay" onclick="if (event.target === this) closeFileModal()">
-        <div class="modal-content" onclick="event.stopPropagation()">
-            <button type="button" class="modal-close" onclick="closeFileModal()" aria-label="Close">×</button>
-            <div id="modal-body"></div>
+    <div id="sidebar">
+        <div id="details-panel">
+            <div class="details-placeholder">Click a node to view its details</div>
         </div>
     </div>
     
@@ -1067,18 +1086,15 @@ def generate_html(data: dict) -> str:
         let selectedNode = null;
         let simulation = null;
 
-        const LAYER_COLORS = ['#00d4aa', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444', '#eab308'];
+        const FILE_CYAN = '#06b6d4';
         const maxMetrics = graphData.maxMetrics;
 
-        // Build layer key
+        // Build legend: Folder (purple), File (cyan)
         const legendLayers = document.getElementById('legend-layers');
-        for (let d = 0; d <= (graphData.maxDepth || 0); d++) {
-            const color = LAYER_COLORS[d % LAYER_COLORS.length];
-            const div = document.createElement('div');
-            div.className = 'legend-item';
-            div.innerHTML = `<div class="legend-circle" style="background: ${color};"></div><span>Layer ${d}</span>`;
-            legendLayers.appendChild(div);
-        }
+        const fileLegend = document.createElement('div');
+        fileLegend.className = 'legend-item';
+        fileLegend.innerHTML = `<div class="legend-circle" style="background: ${FILE_CYAN};"></div><span>File</span>`;
+        legendLayers.appendChild(fileLegend);
         
         const width = document.getElementById('graph-container').clientWidth;
         const height = document.getElementById('graph-container').clientHeight;
@@ -1101,12 +1117,12 @@ def generate_html(data: dict) -> str:
         svg.on('click', () => {
             selectedNode = null;
             updateSelection();
+            renderSidePanel();
         });
         
         function getNodeColor(node) {
             if (node.type === 'folder') return '#7c3aed';
-            const depth = node.depth != null ? node.depth : 0;
-            return LAYER_COLORS[depth % LAYER_COLORS.length];
+            return FILE_CYAN;
         }
 
         function getNodeSize(node) {
@@ -1119,12 +1135,13 @@ def generate_html(data: dict) -> str:
             return Math.max(6, Math.min(24, 6 + normalized * 18));
         }
         
-        function navigateTo(path) {
+        function navigateTo(path, clearPanel) {
+            if (clearPanel) selectedNode = null;
             currentPath = path;
-            selectedNode = null;
             updateBreadcrumb();
             renderGraph();
-            updateDetailsPanel();
+            updateSelection();
+            renderSidePanel();
         }
         
         function focusFile(path) {
@@ -1132,23 +1149,28 @@ def generate_html(data: dict) -> str:
             parts.pop();
             const parentPath = parts.join('/');
             currentPath = parentPath;
-            selectedNode = nodesById.get(path);
+            selectedNode = nodesById.get(path) || null;
             updateBreadcrumb();
             renderGraph();
             updateSelection();
-            if (selectedNode && selectedNode.type === 'file') showDetails(selectedNode);
+            renderSidePanel();
+        }
+        function clearSelection() {
+            selectedNode = null;
+            updateSelection();
+            renderSidePanel();
         }
         
         function updateBreadcrumb() {
             const parts = currentPath ? currentPath.split('/') : [];
-            let html = `<span class="breadcrumb-item" onclick="navigateTo('')">${graphData.rootName}</span>`;
+            let html = `<span class="breadcrumb-item" onclick="navigateTo('', true)">${graphData.rootName}</span>`;
             
             let accumulated = '';
             for (const part of parts) {
                 accumulated += (accumulated ? '/' : '') + part;
                 const p = accumulated;
                 html += `<span class="breadcrumb-sep">/</span>`;
-                html += `<span class="breadcrumb-item" onclick="navigateTo('${p}')">${part}</span>`;
+                html += `<span class="breadcrumb-item" onclick="navigateTo('${p}', true)">${part}</span>`;
             }
             
             document.getElementById('breadcrumb').innerHTML = html;
@@ -1204,7 +1226,7 @@ def generate_html(data: dict) -> str:
                 .selectAll('g')
                 .data(visibleNodes)
                 .join('g')
-                .attr('class', d => `node ${d.id === selectedNode?.id ? 'selected' : ''}`)
+                .attr('class', d => `node ${selectedNode && d.id === selectedNode.id ? 'selected' : ''}`)
                 .attr('data-id', d => d.id)
                 .call(d3.drag()
                     .on('start', dragstarted)
@@ -1212,12 +1234,13 @@ def generate_html(data: dict) -> str:
                     .on('end', dragended))
                 .on('click', (event, d) => {
                     event.stopPropagation();
+                    selectedNode = d;
                     if (d.type === 'folder') {
                         navigateTo(d.path || d.id);
+                    } else {
+                        updateSelection();
+                        renderSidePanel();
                     }
-                    selectedNode = d;
-                    updateSelection();
-                    showDetails(d);
                 });
             
             node.append('circle')
@@ -1230,28 +1253,22 @@ def generate_html(data: dict) -> str:
                 .attr('text-anchor', 'middle')
                 .text(d => d.name.length > 20 ? d.name.slice(0, 18) + '...' : d.name);
             
-            // Folder icon
+            // Folder icon: glassy silver icon centered in node (scale then translate so symbol center 12,12 lands at 0,0)
             node.filter(d => d.type === 'folder')
-                .append('text')
-                .attr('dy', 4)
-                .attr('text-anchor', 'middle')
-                .attr('fill', 'white')
-                .attr('font-size', d => getNodeSize(d) * 0.7)
-                .text('📁');
-            
-            // File icon/label (size = PageRank, so show language abbrev or nothing)
-            node.filter(d => d.type === 'file')
-                .append('text')
-                .attr('dy', 4)
-                .attr('text-anchor', 'middle')
-                .attr('fill', 'white')
-                .attr('font-size', d => Math.max(8, getNodeSize(d) * 0.6))
-                .text(d => {
-                    if (d.language?.includes('TypeScript')) return 'TS';
-                    if (d.language?.includes('JavaScript')) return 'JS';
-                    if (d.language === 'Python') return 'PY';
-                    return '';
-                });
+                .append('g')
+                .attr('class', 'folder-icon')
+                .attr('transform', d => {
+                    const s = (1.2 * getNodeSize(d)) / 24;
+                    const tx = -12 * s;
+                    const ty = -12 * s;
+                    return `translate(${tx},${ty}) scale(${s})`;
+                })
+                .append('use')
+                .attr('href', '#folder-icon')
+                .attr('x', 0)
+                .attr('y', 0)
+                .attr('width', 24)
+                .attr('height', 24);
             
             simulation.on('tick', () => {
                 link
@@ -1298,133 +1315,145 @@ def generate_html(data: dict) -> str:
         }
         
         function updateSelection() {
-            // Update node selection class
+            const sid = selectedNode ? selectedNode.id : null;
             g.selectAll('.node')
-                .classed('selected', d => selectedNode && d.id === selectedNode.id);
-            
-            // Update link visibility - only show links connected to selected node
+                .classed('selected', d => d.id === sid);
             g.selectAll('.link')
                 .classed('visible', d => {
-                    if (!selectedNode) return false;
+                    if (!sid) return false;
                     const sourceId = d.source.id || d.source;
                     const targetId = d.target.id || d.target;
-                    return sourceId === selectedNode.id || targetId === selectedNode.id;
+                    return sourceId === sid || targetId === sid;
                 })
-                .classed('inbound', d => {
-                    if (!selectedNode) return false;
-                    const targetId = d.target.id || d.target;
-                    return targetId === selectedNode.id;
-                })
-                .classed('outbound', d => {
-                    if (!selectedNode) return false;
-                    const sourceId = d.source.id || d.source;
-                    return sourceId === selectedNode.id;
-                })
+                .classed('inbound', d => (d.target.id || d.target) === sid)
+                .classed('outbound', d => (d.source.id || d.source) === sid)
                 .attr('marker-end', d => {
-                    if (!selectedNode) return 'url(#arrowhead)';
                     const sourceId = d.source.id || d.source;
                     const targetId = d.target.id || d.target;
-                    if (targetId === selectedNode.id) return 'url(#arrowhead-inbound)';
-                    if (sourceId === selectedNode.id) return 'url(#arrowhead-outbound)';
+                    if (targetId === sid) return 'url(#arrowhead-inbound)';
+                    if (sourceId === sid) return 'url(#arrowhead-outbound)';
                     return 'url(#arrowhead)';
                 });
         }
-        
-        function updateDetailsPanel() {
-            if (!selectedNode) {
-                document.getElementById('file-modal').classList.remove('visible');
-            }
+
+        function escapeAttr(s) {
+            return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+        function escJs(s) {
+            return String(s).replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "\\\\'");
         }
 
-        function closeFileModal() {
-            selectedNode = null;
-            updateSelection();
-            document.getElementById('file-modal').classList.remove('visible');
-        }
-        
-        function showDetails(node) {
-            if (node.type === 'folder') return;
-            
-            const modal = document.getElementById('file-modal');
-            const body = document.getElementById('modal-body');
+        function getCardHTML(node) {
+            const esc = escapeAttr;
+            if (node.type === 'folder') {
+                return `
+                    <div class="sidebar-section" data-node-id="${esc(node.id)}">
+                        <div class="sidebar-title">
+                            <span>Folder</span>
+                            <button type="button" class="card-remove" onclick="clearSelection()" aria-label="Clear">×</button>
+                        </div>
+                        <div class="file-info">
+                            <div class="file-name">📁 ${esc(node.name)}</div>
+                            <div class="file-path">${esc(node.path || '/')}</div>
+                            <div class="file-meta">
+                                <div class="meta-item">
+                                    <div class="meta-label">Files</div>
+                                    <div class="meta-value">${node.fileCount || 0}</div>
+                                </div>
+                                <div class="meta-item">
+                                    <div class="meta-label">Code Files</div>
+                                    <div class="meta-value">${node.codeFiles || 0}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
             const dependents = node.dependents || [];
             const dependencies = node.dependencies || [];
             const imports = node.imports || [];
-            
-            body.innerHTML = `
-                <div class="file-info">
-                    <div class="file-name">📄 ${node.name}</div>
-                    <div class="file-path">${node.path}</div>
-                    <div class="file-meta four-col">
-                        <div class="meta-item">
-                            <div class="meta-label">Language</div>
-                            <div class="meta-value">${node.language}</div>
-                        </div>
-                        <div class="meta-item">
-                            <div class="meta-label">Lines</div>
-                            <div class="meta-value">${node.loc?.toLocaleString() || 0}</div>
-                        </div>
-                        <div class="meta-item highlight">
-                            <div class="meta-label">Fan-In</div>
-                            <div class="meta-value purple">${node.fanIn || 0}</div>
-                        </div>
-                        <div class="meta-item highlight">
-                            <div class="meta-label">Fan-Out</div>
-                            <div class="meta-value orange">${node.fanOut || 0}</div>
-                        </div>
+            return `
+                <div class="sidebar-section" data-node-id="${esc(node.id)}">
+                    <div class="sidebar-title">
+                        <span>${esc(node.name)}</span>
+                        <button type="button" class="card-remove" onclick="clearSelection()" aria-label="Clear">×</button>
                     </div>
-                    
-                    ${dependents.length > 0 ? `
-                        <div class="deps-section">
-                            <div class="deps-title">
-                                <span style="color:#00d4aa">⬅</span>
-                                Files that import this (<span class="count">${dependents.length}</span>)
+                    <div class="file-info">
+                        <div class="file-name">📄 ${esc(node.name)}</div>
+                        <div class="file-path">${esc(node.path)}</div>
+                        <div class="file-meta four-col">
+                            <div class="meta-item">
+                                <div class="meta-label">Language</div>
+                                <div class="meta-value">${esc(node.language || '')}</div>
                             </div>
-                            ${dependents.slice(0, 8).map(d => `
-                                <div class="dep-item inbound" onclick="focusFile('${d}')">
-                                    <span class="arrow">⬅</span>
-                                    <span class="name" title="${d}">${d.split('/').pop()}</span>
-                                </div>
-                            `).join('')}
-                            ${dependents.length > 8 ? `<div class="empty-state">+${dependents.length - 8} more</div>` : ''}
-                        </div>
-                    ` : ''}
-                    
-                    ${dependencies.length > 0 ? `
-                        <div class="deps-section">
-                            <div class="deps-title">
-                                <span style="color:#f59e0b">➡</span>
-                                Files this imports (<span class="count">${dependencies.length}</span>)
+                            <div class="meta-item">
+                                <div class="meta-label">Lines</div>
+                                <div class="meta-value">${node.loc != null ? node.loc.toLocaleString() : 0}</div>
                             </div>
-                            ${dependencies.slice(0, 8).map(d => `
-                                <div class="dep-item outbound" onclick="focusFile('${d}')">
-                                    <span class="arrow">➡</span>
-                                    <span class="name" title="${d}">${d.split('/').pop()}</span>
+                            <div class="meta-item highlight">
+                                <div class="meta-label">Fan-In</div>
+                                <div class="meta-value purple">${node.fanIn ?? 0}</div>
+                            </div>
+                            <div class="meta-item highlight">
+                                <div class="meta-label">Fan-Out</div>
+                                <div class="meta-value orange">${node.fanOut ?? 0}</div>
+                            </div>
+                        </div>
+                        ${dependents.length > 0 ? `
+                            <div class="deps-section">
+                                <div class="deps-title">
+                                    <span style="color:#00d4aa">⬅</span>
+                                    Files that import this (<span class="count">${dependents.length}</span>)
                                 </div>
-                            `).join('')}
-                            ${dependencies.length > 8 ? `<div class="empty-state">+${dependencies.length - 8} more</div>` : ''}
-                        </div>
-                    ` : ''}
-                    
-                    ${imports.length > 0 && dependencies.length === 0 ? `
-                        <div class="imports-list">
-                            <div class="imports-title">Raw Imports (${imports.length})</div>
-                            ${imports.slice(0, 10).map(i => `<div class="import-item">${i}</div>`).join('')}
-                            ${imports.length > 10 ? `<div class="import-item" style="color:#666">...and ${imports.length - 10} more</div>` : ''}
-                        </div>
-                    ` : ''}
-                    
-                    ${dependents.length === 0 && dependencies.length === 0 ? `
-                        <div class="empty-state" style="margin-top: 16px;">
-                            No resolved dependencies in this view.<br>
-                            <span style="font-size: 10px; color: #444;">
-                                (External packages or unresolved paths)
-                            </span>
-                        </div>
-                    ` : ''}
+                                ${dependents.slice(0, 8).map(d => `
+                                    <div class="dep-item inbound" onclick="focusFile('${escJs(d)}')">
+                                        <span class="arrow">⬅</span>
+                                        <span class="name" title="${esc(d)}">${esc(d.split('/').pop())}</span>
+                                    </div>
+                                `).join('')}
+                                ${dependents.length > 8 ? `<div class="empty-state">+${dependents.length - 8} more</div>` : ''}
+                            </div>
+                        ` : ''}
+                        ${dependencies.length > 0 ? `
+                            <div class="deps-section">
+                                <div class="deps-title">
+                                    <span style="color:#f59e0b">➡</span>
+                                    Files this imports (<span class="count">${dependencies.length}</span>)
+                                </div>
+                                ${dependencies.slice(0, 8).map(d => `
+                                    <div class="dep-item outbound" onclick="focusFile('${escJs(d)}')">
+                                        <span class="arrow">➡</span>
+                                        <span class="name" title="${esc(d)}">${esc(d.split('/').pop())}</span>
+                                    </div>
+                                `).join('')}
+                                ${dependencies.length > 8 ? `<div class="empty-state">+${dependencies.length - 8} more</div>` : ''}
+                            </div>
+                        ` : ''}
+                        ${imports.length > 0 && dependencies.length === 0 ? `
+                            <div class="imports-list">
+                                <div class="imports-title">Raw Imports (${imports.length})</div>
+                                ${imports.slice(0, 10).map(i => `<div class="import-item">${esc(i)}</div>`).join('')}
+                                ${imports.length > 10 ? `<div class="empty-state">...and ${imports.length - 10} more</div>` : ''}
+                            </div>
+                        ` : ''}
+                        ${dependents.length === 0 && dependencies.length === 0 ? `
+                            <div class="empty-state" style="margin-top: 16px;">
+                                No resolved dependencies in this view.<br>
+                                <span style="font-size: 10px; color: #444;">(External packages or unresolved paths)</span>
+                            </div>
+                        ` : ''}
+                    </div>
                 </div>
             `;
-            modal.classList.add('visible');
+        }
+
+        function renderSidePanel() {
+            const panel = document.getElementById('details-panel');
+            if (!selectedNode) {
+                panel.innerHTML = '<div class="details-placeholder">Click a node to view its details</div>';
+                return;
+            }
+            panel.innerHTML = getCardHTML(selectedNode);
         }
         
         // Initial render
