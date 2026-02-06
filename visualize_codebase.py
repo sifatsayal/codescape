@@ -611,6 +611,9 @@ def generate_html(data: dict) -> str:
         .breadcrumb-sep {
             color: #444;
         }
+        .breadcrumb-file {
+            color: #06b6d4;
+        }
         
         #graph-container {
             position: fixed;
@@ -669,6 +672,33 @@ def generate_html(data: dict) -> str:
             text-align: center;
             font-size: 13px;
         }
+        .details-repo-stats {
+            padding: 20px 16px;
+        }
+        .details-repo-stats .stats-title {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #666;
+            margin-bottom: 14px;
+        }
+        .details-repo-stats .stat {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(100, 100, 150, 0.15);
+            font-size: 13px;
+            color: #888;
+        }
+        .details-repo-stats .stat:last-child { border-bottom: none; }
+        .details-repo-stats .stat-value {
+            color: #00d4aa;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
         
         .file-info {
             background: rgba(30, 30, 50, 0.5);
@@ -678,10 +708,18 @@ def generate_html(data: dict) -> str:
         }
         
         .file-name {
+            display: flex;
+            align-items: center;
+            gap: 10px;
             font-size: 16px;
             font-weight: 600;
             margin-bottom: 8px;
             word-break: break-all;
+        }
+        .sidebar-icon {
+            flex-shrink: 0;
+            width: 22px;
+            height: 22px;
         }
         
         .file-path {
@@ -864,12 +902,13 @@ def generate_html(data: dict) -> str:
         
         .node circle {
             stroke-width: 2px;
-            transition: all 0.2s;
+            transition: stroke-width 0.05s ease-out;
         }
         
         .node.selected circle {
             stroke-width: 4px;
             filter: brightness(1.3) drop-shadow(0 0 8px currentColor);
+            transition: stroke-width 0.05s ease-out;
         }
         
         .node:hover circle {
@@ -920,43 +959,119 @@ def generate_html(data: dict) -> str:
             fill: #7c3aed;
         }
         
-        .legend-title {
-            font-weight: 600;
-            font-size: 12px;
-            color: #888;
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
         #legend {
             position: fixed;
             bottom: 20px;
             left: 20px;
+            width: 260px;
             background: rgba(15, 15, 25, 0.95);
-            padding: 16px;
-            border-radius: 12px;
+            padding: 18px 12px 18px 18px;
+            border-radius: 14px;
             border: 1px solid rgba(100, 100, 150, 0.2);
-            font-size: 12px;
+            font-size: 13px;
+            transition: width 0.2s ease, padding 0.2s ease;
         }
-        
-        .legend-item {
+        #legend.collapsed {
+            width: auto;
+            padding: 10px 14px;
+        }
+        #legend.collapsed .legend-body {
+            display: none;
+        }
+        #legend.collapsed .legend-header {
+            margin-bottom: 0;
+        }
+        .legend-header {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 10px;
-            margin-bottom: 8px;
+            cursor: pointer;
+            margin-bottom: 14px;
+            user-select: none;
         }
-        
+        .legend-header:hover { opacity: 0.9; }
+        .legend-toggle {
+            font-size: 10px;
+            color: #8b8b95;
+            transition: transform 0.2s ease;
+        }
+        #legend.collapsed .legend-toggle {
+            transform: rotate(-90deg);
+        }
+        .legend-title {
+            font-weight: 700;
+            font-size: 13px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #8b8b95;
+            margin: 0;
+        }
+        .legend-section { margin-bottom: 14px; }
+        .legend-divider {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(100,100,150,0.2);
+        }
+        .legend-section-title {
+            font-weight: 700;
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .legend-grid {
+            display: grid;
+            grid-template-columns: 44px 1fr;
+            gap: 10px 12px;
+            align-items: center;
+        }
+        .legend-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .legend-label .legend-name {
+            font-weight: 600;
+            color: #e7e7ee;
+            line-height: 1.1;
+        }
+        .legend-caption,
+        .legend-caption-top {
+            font-size: 11px;
+            color: #7b7b87;
+            line-height: 1.3;
+        }
+        .legend-caption-top {
+            margin: -2px 0 10px;
+            max-width: 200px;
+        }
         .legend-circle {
-            width: 14px;
-            height: 14px;
+            width: 18px;
+            height: 18px;
             border-radius: 50%;
         }
-        
-        .legend-line {
+        .legend-folder-node {
             width: 24px;
-            height: 3px;
-            border-radius: 2px;
+            height: 24px;
+            filter: drop-shadow(0 0 10px rgba(124,58,237,0.15));
         }
+        .legend-folder-node circle { fill: #7c3aed; }
+        .legend-arrow {
+            width: 52px;
+            height: 16px;
+            display: block;
+        }
+        .legend-arrow line { fill: none; stroke-width: 2; stroke-dasharray: 8 8; }
+        .legend-layer-swatch {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: 2px dashed rgba(180,180,220,0.55);
+            background: rgba(124,58,237,0.10);
+        }
+
         
         #help {
             position: fixed;
@@ -998,20 +1113,6 @@ def generate_html(data: dict) -> str:
 <body>
     <div id="header">
         <h1>⬡ Codescape</h1>
-        <div class="stats">
-            <div class="stat">
-                <span>Files:</span>
-                <span class="stat-value">''' + str(data['stats']['totalFiles']) + '''</span>
-            </div>
-            <div class="stat">
-                <span>Deps:</span>
-                <span class="stat-value">''' + str(data['stats']['totalDependencies']) + '''</span>
-            </div>
-            <div class="stat">
-                <span>LOC:</span>
-                <span class="stat-value">''' + f"{data['stats']['totalLoc']:,}" + '''</span>
-            </div>
-        </div>
         <div class="breadcrumb" id="breadcrumb">
             <span class="breadcrumb-item" onclick="navigateTo('', true)">''' + data['rootName'] + '''</span>
         </div>
@@ -1038,6 +1139,9 @@ def generate_html(data: dict) -> str:
                 <symbol id="folder-icon" viewBox="0 0 24 24">
                     <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" fill="url(#folderSilverGrad)" filter="url(#folder-glow)"/>
                 </symbol>
+                <symbol id="file-icon" viewBox="0 0 24 24">
+                    <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z" fill="url(#folderSilverGrad)" filter="url(#folder-glow)"/>
+                </symbol>
                 <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
                     <polygon points="0 0, 10 3.5, 0 7" fill="#06b6d4"/>
                 </marker>
@@ -1058,22 +1162,64 @@ def generate_html(data: dict) -> str:
     </div>
     
     <div id="legend">
-        <div class="legend-title">Key</div>
-        <div class="legend-item">
-            <div class="legend-circle" style="background: #7c3aed;"></div>
-            <span>Folder</span>
-        </div>
-        <div id="legend-layers"></div>
-        <div class="legend-item" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(100,100,150,0.2);">
-            <div class="legend-line" style="background: #00d4aa;"></div>
-            <span>Inbound</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-line" style="background: #f59e0b;"></div>
-            <span>Outbound</span>
-        </div>
+  <div class="legend-header" id="legend-toggle" title="Click to collapse or expand key">
+    <span class="legend-title">Key</span>
+    <span class="legend-toggle" aria-hidden="true">▼</span>
+  </div>
+  <div class="legend-body">
+  <div class="legend-section">
+    <div class="legend-section-title">Nodes</div>
+    <div class="legend-caption-top">Node size: files by PageRank importance, folders by file count.</div>
+    <div class="legend-grid">
+      <div class="legend-icon">
+        <svg class="legend-folder-node" viewBox="0 0 36 36">
+          <circle cx="18" cy="18" r="15"></circle>
+          <use href="#folder-icon" x="8" y="8" width="20" height="20"></use>
+        </svg>
+      </div>
+      <div class="legend-label">
+        <div class="legend-name">Folder node</div>
+        <div class="legend-caption">Click to open</div>
+      </div>
+
+      <div class="legend-icon">
+        <div class="legend-circle" id="legend-file-circle"></div>
+      </div>
+      <div class="legend-label">
+        <div class="legend-name">File node</div>
+        <div class="legend-caption">Select to show deps</div>
+      </div>
     </div>
-    
+  </div>
+
+  <div class="legend-section legend-divider">
+    <div class="legend-section-title">Dependencies</div>
+    <div class="legend-caption-top">A → B means A depends on B. Arrows show when a file is selected.</div>
+    <div class="legend-grid">
+      <div class="legend-icon">
+        <svg class="legend-arrow" viewBox="0 0 52 16">
+          <line x1="0" y1="8" x2="44" y2="8" stroke="#00d4aa" marker-end="url(#arrowhead-inbound)"></line>
+        </svg>
+      </div>
+      <div class="legend-label">
+        <div class="legend-name">Inbound</div>
+        <div class="legend-caption">Files that import this file</div>
+      </div>
+
+      <div class="legend-icon">
+        <svg class="legend-arrow" viewBox="0 0 52 16">
+          <line x1="0" y1="8" x2="44" y2="8" stroke="#f59e0b" marker-end="url(#arrowhead-outbound)"></line>
+        </svg>
+      </div>
+      <div class="legend-label">
+        <div class="legend-name">Outbound</div>
+        <div class="legend-caption">Files this file imports</div>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
     <div id="help">
         <span class="help-key">Scroll</span> zoom
         <span class="help-key">Drag</span> pan
@@ -1098,13 +1244,12 @@ def generate_html(data: dict) -> str:
         const FILE_CYAN = '#06b6d4';
         const maxMetrics = graphData.maxMetrics;
 
-        // Build legend: Folder (purple), File (cyan)
-        const legendLayers = document.getElementById('legend-layers');
-        const fileLegend = document.createElement('div');
-        fileLegend.className = 'legend-item';
-        fileLegend.innerHTML = `<div class="legend-circle" style="background: ${FILE_CYAN};"></div><span>File</span>`;
-        legendLayers.appendChild(fileLegend);
-        
+        document.getElementById('legend-file-circle').style.background = FILE_CYAN;
+
+        document.getElementById('legend-toggle').addEventListener('click', function () {
+            document.getElementById('legend').classList.toggle('collapsed');
+        });
+
         const width = document.getElementById('graph-container').clientWidth;
         const height = document.getElementById('graph-container').clientHeight;
         
@@ -1125,6 +1270,7 @@ def generate_html(data: dict) -> str:
         // Click on background to deselect
         svg.on('click', () => {
             selectedNode = null;
+            updateBreadcrumb();
             updateSelection();
             renderSidePanel();
         });
@@ -1166,6 +1312,7 @@ def generate_html(data: dict) -> str:
         }
         function clearSelection() {
             selectedNode = null;
+            updateBreadcrumb();
             updateSelection();
             renderSidePanel();
         }
@@ -1179,7 +1326,10 @@ def generate_html(data: dict) -> str:
                 accumulated += (accumulated ? '/' : '') + part;
                 const p = accumulated;
                 html += `<span class="breadcrumb-sep">/</span>`;
-                html += `<span class="breadcrumb-item" onclick="navigateTo('${p}', true)">${part}</span>`;
+                html += `<span class="breadcrumb-item" onclick="navigateTo('${p}', true)">${escapeAttr(part)}</span>`;
+            }
+            if (selectedNode && selectedNode.type !== 'folder') {
+                html += `<span class="breadcrumb-sep">/</span><span class="breadcrumb-file">${escapeAttr(selectedNode.name)}</span>`;
             }
             
             document.getElementById('breadcrumb').innerHTML = html;
@@ -1247,6 +1397,7 @@ def generate_html(data: dict) -> str:
                     if (d.type === 'folder') {
                         navigateTo(d.path || d.id);
                     } else {
+                        updateBreadcrumb();
                         updateSelection();
                         renderSidePanel();
                     }
@@ -1365,7 +1516,7 @@ def generate_html(data: dict) -> str:
                             <button type="button" class="card-remove" onclick="clearSelection()" aria-label="Clear">×</button>
                         </div>
                         <div class="file-info">
-                            <div class="file-name">📁 ${esc(node.name)}</div>
+                            <div class="file-name"><svg class="sidebar-icon" viewBox="0 0 24 24"><use href="#folder-icon"/></svg><span>${esc(node.name)}</span></div>
                             <div class="file-path">${esc(node.path || '/')}</div>
                             <div class="file-meta">
                                 <div class="meta-item">
@@ -1387,11 +1538,11 @@ def generate_html(data: dict) -> str:
             return `
                 <div class="sidebar-section" data-node-id="${esc(node.id)}">
                     <div class="sidebar-title">
-                        <span>${esc(node.name)}</span>
+                        <span>File</span>
                         <button type="button" class="card-remove" onclick="clearSelection()" aria-label="Clear">×</button>
                     </div>
                     <div class="file-info">
-                        <div class="file-name">📄 ${esc(node.name)}</div>
+                        <div class="file-name"><svg class="sidebar-icon" viewBox="0 0 24 24"><use href="#file-icon"/></svg><span>${esc(node.name)}</span></div>
                         <div class="file-path">${esc(node.path)}</div>
                         <div class="file-meta four-col">
                             <div class="meta-item">
@@ -1461,11 +1612,27 @@ def generate_html(data: dict) -> str:
 
         function renderSidePanel() {
             const panel = document.getElementById('details-panel');
-            if (!selectedNode) {
-                panel.innerHTML = '<div class="details-placeholder">Click a node to view its details</div>';
+            if (selectedNode) {
+                panel.innerHTML = getCardHTML(selectedNode);
                 return;
             }
-            panel.innerHTML = getCardHTML(selectedNode);
+            if (currentPath) {
+                const folderNode = nodesById.get(currentPath);
+                if (folderNode) {
+                    panel.innerHTML = getCardHTML(folderNode);
+                    return;
+                }
+            }
+            const s = graphData.stats || {};
+            const loc = (s.totalLoc != null) ? s.totalLoc.toLocaleString() : '0';
+            panel.innerHTML = `
+                <div class="details-repo-stats">
+                    <div class="stats-title">Repository</div>
+                    <div class="stat"><span>Files</span><span class="stat-value">${s.totalFiles ?? 0}</span></div>
+                    <div class="stat"><span>Dependencies</span><span class="stat-value">${s.totalDependencies ?? 0}</span></div>
+                    <div class="stat"><span>Lines of code</span><span class="stat-value">${loc}</span></div>
+                </div>
+            `;
         }
         
         // Initial render
