@@ -377,7 +377,11 @@ class CodebaseAnalyzer:
         """Build data structure for D3 visualization."""
         nodes = []
         links = []
-        
+
+        def depth_from_path(path: str) -> int:
+            """Depth = number of path segments (root = 0)."""
+            return len([p for p in (path or '').split('/') if p])
+
         # Add folder nodes
         for path, info in self.folders.items():
             node_id = path or 'root'
@@ -386,26 +390,28 @@ class CodebaseAnalyzer:
                 'name': info['name'],
                 'type': 'folder',
                 'path': path,
+                'depth': depth_from_path(path),
                 'fileCount': info['file_count'],
                 'codeFiles': info['code_files'],
                 'children': info['children'],
             })
-        
+
         # Add file nodes with metrics
         for path, info in self.files.items():
             fan_in = self.fan_in.get(path, 0)
             fan_out = self.fan_out.get(path, 0)
             pr = self.pagerank.get(path, 0)
-            
+
             # Get resolved dependencies and dependents
             deps = list(self.dependencies.get(path, set()))
             depts = list(self.dependents.get(path, set()))
-            
+
             nodes.append({
                 'id': path,
                 'name': info['name'],
                 'type': 'file',
                 'path': path,
+                'depth': depth_from_path(path),
                 'language': info['language'],
                 'extension': info['extension'],
                 'loc': info['loc'],
@@ -460,11 +466,14 @@ class CodebaseAnalyzer:
         max_fan_out = max((self.fan_out.get(p, 0) for p in self.files), default=1) or 1
         max_pagerank = max((self.pagerank.get(p, 0) for p in self.files), default=0.0001) or 0.0001
         
+        max_depth = max((n.get('depth', 0) for n in nodes), default=0)
+
         return {
             'nodes': nodes,
             'links': links,
             'rootName': self.root.name,
             'hotspots': hotspots,
+            'maxDepth': max_depth,
             'maxMetrics': {
                 'fanIn': max_fan_in,
                 'fanOut': max_fan_out,
@@ -607,43 +616,56 @@ def generate_html(data: dict) -> str:
             position: fixed;
             top: 60px;
             left: 0;
-            right: 380px;
+            right: 0;
             bottom: 0;
         }
-        
-        #sidebar {
+
+        .modal-overlay {
+            display: none;
             position: fixed;
-            top: 60px;
-            right: 0;
-            width: 380px;
-            bottom: 0;
-            background: rgba(15, 15, 25, 0.95);
-            border-left: 1px solid rgba(100, 100, 150, 0.2);
-            overflow-y: auto;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
             padding: 20px;
         }
-        
-        .sidebar-section {
-            margin-bottom: 24px;
+        .modal-overlay.visible {
+            display: flex;
         }
-        
-        .sidebar-title {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #666;
-            margin-bottom: 12px;
+        .modal-content {
+            position: relative;
+            max-width: 480px;
+            width: 100%;
+            max-height: 85vh;
+            overflow-y: auto;
+            background: rgba(18, 18, 28, 0.98);
+            border: 1px solid rgba(100, 100, 150, 0.25);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+        }
+        .modal-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: rgba(100, 100, 150, 0.2);
+            color: #888;
+            font-size: 20px;
+            line-height: 1;
+            border-radius: 8px;
+            cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 8px;
+            justify-content: center;
+            padding: 0;
         }
-        
-        .sidebar-title .badge {
-            background: rgba(124, 58, 237, 0.3);
-            color: #a78bfa;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 10px;
+        .modal-close:hover {
+            background: rgba(100, 100, 150, 0.35);
+            color: #e0e0e0;
         }
         
         .file-info {
@@ -829,71 +851,6 @@ def generate_html(data: dict) -> str:
             font-family: 'JetBrains Mono', monospace;
         }
         
-        .hotspot-item {
-            padding: 12px;
-            background: rgba(20, 20, 35, 0.4);
-            border-radius: 8px;
-            margin-bottom: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-            border-left: 3px solid transparent;
-        }
-        
-        .hotspot-item:hover {
-            background: rgba(124, 58, 237, 0.15);
-        }
-        
-        .hotspot-item.rank-1 { border-left-color: #fbbf24; }
-        .hotspot-item.rank-2 { border-left-color: #94a3b8; }
-        .hotspot-item.rank-3 { border-left-color: #b45309; }
-        
-        .hotspot-header {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 6px;
-        }
-        
-        .hotspot-rank {
-            font-size: 11px;
-            font-weight: 600;
-            color: #555;
-            width: 20px;
-        }
-        
-        .hotspot-name {
-            font-size: 13px;
-            font-weight: 500;
-            color: #e0e0e0;
-            flex: 1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        
-        .hotspot-metric {
-            font-size: 11px;
-            color: #00d4aa;
-            font-family: 'JetBrains Mono', monospace;
-        }
-        
-        .hotspot-path {
-            font-size: 11px;
-            color: #555;
-            font-family: 'JetBrains Mono', monospace;
-            margin-left: 28px;
-            margin-bottom: 4px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        
-        .hotspot-explanation {
-            font-size: 11px;
-            color: #888;
-            margin-left: 28px;
-        }
-        
         svg {
             width: 100%;
             height: 100%;
@@ -952,6 +909,14 @@ def generate_html(data: dict) -> str:
             fill: #7c3aed;
         }
         
+        .legend-title {
+            font-weight: 600;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
         #legend {
             position: fixed;
             bottom: 20px;
@@ -985,7 +950,7 @@ def generate_html(data: dict) -> str:
         #help {
             position: fixed;
             bottom: 20px;
-            right: 400px;
+            right: 20px;
             background: rgba(15, 15, 25, 0.95);
             padding: 12px 16px;
             border-radius: 12px;
@@ -1036,25 +1001,6 @@ def generate_html(data: dict) -> str:
                 <span class="stat-value">''' + f"{data['stats']['totalLoc']:,}" + '''</span>
             </div>
         </div>
-        <div class="controls">
-            <div class="control-group">
-                <label>Size by:</label>
-                <select id="sizeMode">
-                    <option value="loc">Lines of Code</option>
-                    <option value="fanIn" selected>Fan-In (dependents)</option>
-                    <option value="fanOut">Fan-Out (dependencies)</option>
-                    <option value="pagerank">PageRank</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label>Color by:</label>
-                <select id="colorMode">
-                    <option value="language" selected>Language</option>
-                    <option value="fanIn">Fan-In (importance)</option>
-                    <option value="fanOut">Fan-Out (coupling)</option>
-                </select>
-            </div>
-        </div>
         <div class="breadcrumb" id="breadcrumb">
             <span class="breadcrumb-item" onclick="navigateTo('')">''' + data['rootName'] + '''</span>
         </div>
@@ -1076,41 +1022,20 @@ def generate_html(data: dict) -> str:
         </svg>
     </div>
     
-    <div id="sidebar">
-        <div class="sidebar-section">
-            <div class="sidebar-title">🔥 Hotspots <span class="badge">Most Depended</span></div>
-            <div id="hotspots-list">
-                ''' + ''.join([f'''
-                <div class="hotspot-item rank-{i+1 if i < 3 else ''}" onclick="focusFile('{h['path']}')">
-                    <div class="hotspot-header">
-                        <span class="hotspot-rank">#{i+1}</span>
-                        <span class="hotspot-name">{h['name']}</span>
-                        <span class="hotspot-metric">⬅ {h['fanIn']}</span>
-                    </div>
-                    <div class="hotspot-path">{h['path']}</div>
-                    <div class="hotspot-explanation">{h['explanation']}</div>
-                </div>
-                ''' for i, h in enumerate(data['hotspots'][:10])]) + '''
-            </div>
-        </div>
-        <div id="details-panel">
-            <div class="placeholder">Click on a node to view details</div>
+    <div id="file-modal" class="modal-overlay" onclick="if (event.target === this) closeFileModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <button type="button" class="modal-close" onclick="closeFileModal()" aria-label="Close">×</button>
+            <div id="modal-body"></div>
         </div>
     </div>
     
     <div id="legend">
+        <div class="legend-title">Key</div>
         <div class="legend-item">
             <div class="legend-circle" style="background: #7c3aed;"></div>
             <span>Folder</span>
         </div>
-        <div class="legend-item">
-            <div class="legend-circle" style="background: #00d4aa;"></div>
-            <span>TypeScript/JavaScript</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-circle" style="background: #f59e0b;"></div>
-            <span>Python</span>
-        </div>
+        <div id="legend-layers"></div>
         <div class="legend-item" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(100,100,150,0.2);">
             <div class="legend-line" style="background: #00d4aa;"></div>
             <span>Inbound (depends on selected)</span>
@@ -1141,10 +1066,19 @@ def generate_html(data: dict) -> str:
         let currentPath = '';
         let selectedNode = null;
         let simulation = null;
-        let sizeMode = 'fanIn';
-        let colorMode = 'language';
-        
+
+        const LAYER_COLORS = ['#00d4aa', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444', '#eab308'];
         const maxMetrics = graphData.maxMetrics;
+
+        // Build layer key
+        const legendLayers = document.getElementById('legend-layers');
+        for (let d = 0; d <= (graphData.maxDepth || 0); d++) {
+            const color = LAYER_COLORS[d % LAYER_COLORS.length];
+            const div = document.createElement('div');
+            div.className = 'legend-item';
+            div.innerHTML = `<div class="legend-circle" style="background: ${color};"></div><span>Layer ${d}</span>`;
+            legendLayers.appendChild(div);
+        }
         
         const width = document.getElementById('graph-container').clientWidth;
         const height = document.getElementById('graph-container').clientHeight;
@@ -1169,69 +1103,18 @@ def generate_html(data: dict) -> str:
             updateSelection();
         });
         
-        // Control listeners
-        document.getElementById('sizeMode').addEventListener('change', (e) => {
-            sizeMode = e.target.value;
-            renderGraph();
-        });
-        
-        document.getElementById('colorMode').addEventListener('change', (e) => {
-            colorMode = e.target.value;
-            renderGraph();
-        });
-        
-        // Color scales
-        const fanInColorScale = d3.scaleSequential(d3.interpolateGreens)
-            .domain([0, Math.log(maxMetrics.fanIn + 1)]);
-        const fanOutColorScale = d3.scaleSequential(d3.interpolateOranges)
-            .domain([0, Math.log(maxMetrics.fanOut + 1)]);
-        
         function getNodeColor(node) {
             if (node.type === 'folder') return '#7c3aed';
-            
-            if (colorMode === 'fanIn' && node.fanIn !== undefined) {
-                const intensity = Math.log(node.fanIn + 1) / Math.log(maxMetrics.fanIn + 1);
-                return d3.interpolateRgb('#1a3a1a', '#00ff88')(Math.min(1, intensity * 1.5));
-            }
-            if (colorMode === 'fanOut' && node.fanOut !== undefined) {
-                const intensity = Math.log(node.fanOut + 1) / Math.log(maxMetrics.fanOut + 1);
-                return d3.interpolateRgb('#3a2a1a', '#ffaa00')(Math.min(1, intensity * 1.5));
-            }
-            
-            // Default: by language
-            const lang = node.language || '';
-            if (lang.includes('TypeScript') || lang.includes('JavaScript')) return '#00d4aa';
-            if (lang === 'Python') return '#f59e0b';
-            if (lang === 'Go') return '#00add8';
-            if (lang === 'Rust') return '#ff6b35';
-            if (lang === 'CSS' || lang === 'SCSS') return '#e91e8c';
-            if (lang === 'JSON' || lang === 'YAML' || lang === 'TOML') return '#6b7280';
-            return '#3b82f6';
+            const depth = node.depth != null ? node.depth : 0;
+            return LAYER_COLORS[depth % LAYER_COLORS.length];
         }
-        
+
         function getNodeSize(node) {
             if (node.type === 'folder') {
                 return Math.min(30, 12 + Math.sqrt(node.fileCount || 1) * 3);
             }
-            
-            let value = 1;
-            let maxValue = 1;
-            
-            if (sizeMode === 'fanIn') {
-                value = node.fanIn || 0;
-                maxValue = maxMetrics.fanIn;
-            } else if (sizeMode === 'fanOut') {
-                value = node.fanOut || 0;
-                maxValue = maxMetrics.fanOut;
-            } else if (sizeMode === 'pagerank') {
-                value = node.pagerank || 0;
-                maxValue = maxMetrics.pagerank;
-            } else {
-                value = node.loc || 1;
-                maxValue = 1000;
-            }
-            
-            // Scale: min 6, max 24 for files
+            const value = node.pagerank || 0;
+            const maxValue = maxMetrics.pagerank || 1;
             const normalized = Math.sqrt(value) / Math.sqrt(maxValue || 1);
             return Math.max(6, Math.min(24, 6 + normalized * 18));
         }
@@ -1245,17 +1128,15 @@ def generate_html(data: dict) -> str:
         }
         
         function focusFile(path) {
-            // Navigate to the file's parent folder and select it
             const parts = path.split('/');
-            parts.pop(); // Remove filename
+            parts.pop();
             const parentPath = parts.join('/');
-            
             currentPath = parentPath;
             selectedNode = nodesById.get(path);
             updateBreadcrumb();
             renderGraph();
-            updateDetailsPanel();
             updateSelection();
+            if (selectedNode && selectedNode.type === 'file') showDetails(selectedNode);
         }
         
         function updateBreadcrumb() {
@@ -1358,7 +1239,7 @@ def generate_html(data: dict) -> str:
                 .attr('font-size', d => getNodeSize(d) * 0.7)
                 .text('📁');
             
-            // File icon/label based on metrics
+            // File icon/label (size = PageRank, so show language abbrev or nothing)
             node.filter(d => d.type === 'file')
                 .append('text')
                 .attr('dy', 4)
@@ -1366,8 +1247,6 @@ def generate_html(data: dict) -> str:
                 .attr('fill', 'white')
                 .attr('font-size', d => Math.max(8, getNodeSize(d) * 0.6))
                 .text(d => {
-                    if (sizeMode === 'fanIn' && d.fanIn > 0) return d.fanIn;
-                    if (sizeMode === 'fanOut' && d.fanOut > 0) return d.fanOut;
                     if (d.language?.includes('TypeScript')) return 'TS';
                     if (d.language?.includes('JavaScript')) return 'JS';
                     if (d.language === 'Python') return 'PY';
@@ -1453,140 +1332,99 @@ def generate_html(data: dict) -> str:
         
         function updateDetailsPanel() {
             if (!selectedNode) {
-                document.getElementById('details-panel').innerHTML = 
-                    '<div class="placeholder">Click on a node to view details</div>';
+                document.getElementById('file-modal').classList.remove('visible');
             }
+        }
+
+        function closeFileModal() {
+            selectedNode = null;
+            updateSelection();
+            document.getElementById('file-modal').classList.remove('visible');
         }
         
         function showDetails(node) {
-            const panel = document.getElementById('details-panel');
+            if (node.type === 'folder') return;
             
-            if (node.type === 'folder') {
-                const children = (node.children || []).map(id => nodesById.get(id)).filter(Boolean);
-                const folders = children.filter(c => c.type === 'folder');
-                const files = children.filter(c => c.type === 'file');
-                
-                panel.innerHTML = `
-                    <div class="sidebar-section">
-                        <div class="sidebar-title">Folder</div>
-                        <div class="file-info">
-                            <div class="file-name">📁 ${node.name}</div>
-                            <div class="file-path">${node.path || '/'}</div>
-                            <div class="file-meta">
-                                <div class="meta-item">
-                                    <div class="meta-label">Files</div>
-                                    <div class="meta-value">${node.fileCount || 0}</div>
-                                </div>
-                                <div class="meta-item">
-                                    <div class="meta-label">Code Files</div>
-                                    <div class="meta-value">${node.codeFiles || 0}</div>
-                                </div>
-                            </div>
+            const modal = document.getElementById('file-modal');
+            const body = document.getElementById('modal-body');
+            const dependents = node.dependents || [];
+            const dependencies = node.dependencies || [];
+            const imports = node.imports || [];
+            
+            body.innerHTML = `
+                <div class="file-info">
+                    <div class="file-name">📄 ${node.name}</div>
+                    <div class="file-path">${node.path}</div>
+                    <div class="file-meta four-col">
+                        <div class="meta-item">
+                            <div class="meta-label">Language</div>
+                            <div class="meta-value">${node.language}</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="meta-label">Lines</div>
+                            <div class="meta-value">${node.loc?.toLocaleString() || 0}</div>
+                        </div>
+                        <div class="meta-item highlight">
+                            <div class="meta-label">Fan-In</div>
+                            <div class="meta-value purple">${node.fanIn || 0}</div>
+                        </div>
+                        <div class="meta-item highlight">
+                            <div class="meta-label">Fan-Out</div>
+                            <div class="meta-value orange">${node.fanOut || 0}</div>
                         </div>
                     </div>
-                    <div class="sidebar-section">
-                        <div class="sidebar-title">Contents (${children.length})</div>
-                        <div class="folder-contents">
-                            ${folders.map(f => `
-                                <div class="folder-item" onclick="navigateTo('${f.path || f.id}'); showDetails(nodesById.get('${f.path || f.id}'))">
-                                    <span class="folder-icon">📁</span>
-                                    <span class="item-name">${f.name}</span>
-                                    <span class="item-meta">${f.fileCount || 0}</span>
+                    
+                    ${dependents.length > 0 ? `
+                        <div class="deps-section">
+                            <div class="deps-title">
+                                <span style="color:#00d4aa">⬅</span>
+                                Files that import this (<span class="count">${dependents.length}</span>)
+                            </div>
+                            ${dependents.slice(0, 8).map(d => `
+                                <div class="dep-item inbound" onclick="focusFile('${d}')">
+                                    <span class="arrow">⬅</span>
+                                    <span class="name" title="${d}">${d.split('/').pop()}</span>
                                 </div>
                             `).join('')}
-                            ${files.slice(0, 15).map(f => `
-                                <div class="folder-item" onclick="selectedNode = nodesById.get('${f.path}'); updateSelection(); showDetails(nodesById.get('${f.path}'))">
-                                    <span class="folder-icon">📄</span>
-                                    <span class="item-name">${f.name}</span>
-                                    <span class="item-meta">${f.fanIn || 0}⬅ ${f.fanOut || 0}➡</span>
+                            ${dependents.length > 8 ? `<div class="empty-state">+${dependents.length - 8} more</div>` : ''}
+                        </div>
+                    ` : ''}
+                    
+                    ${dependencies.length > 0 ? `
+                        <div class="deps-section">
+                            <div class="deps-title">
+                                <span style="color:#f59e0b">➡</span>
+                                Files this imports (<span class="count">${dependencies.length}</span>)
+                            </div>
+                            ${dependencies.slice(0, 8).map(d => `
+                                <div class="dep-item outbound" onclick="focusFile('${d}')">
+                                    <span class="arrow">➡</span>
+                                    <span class="name" title="${d}">${d.split('/').pop()}</span>
                                 </div>
                             `).join('')}
-                            ${files.length > 15 ? `<div class="folder-item" style="color:#666">...and ${files.length - 15} more files</div>` : ''}
+                            ${dependencies.length > 8 ? `<div class="empty-state">+${dependencies.length - 8} more</div>` : ''}
                         </div>
-                    </div>
-                `;
-            } else {
-                const dependents = node.dependents || [];
-                const dependencies = node.dependencies || [];
-                const imports = node.imports || [];
-                
-                panel.innerHTML = `
-                    <div class="sidebar-section">
-                        <div class="sidebar-title">File Details</div>
-                        <div class="file-info">
-                            <div class="file-name">📄 ${node.name}</div>
-                            <div class="file-path">${node.path}</div>
-                            <div class="file-meta four-col">
-                                <div class="meta-item">
-                                    <div class="meta-label">Language</div>
-                                    <div class="meta-value">${node.language}</div>
-                                </div>
-                                <div class="meta-item">
-                                    <div class="meta-label">Lines</div>
-                                    <div class="meta-value">${node.loc?.toLocaleString() || 0}</div>
-                                </div>
-                                <div class="meta-item highlight">
-                                    <div class="meta-label">Fan-In</div>
-                                    <div class="meta-value purple">${node.fanIn || 0}</div>
-                                </div>
-                                <div class="meta-item highlight">
-                                    <div class="meta-label">Fan-Out</div>
-                                    <div class="meta-value orange">${node.fanOut || 0}</div>
-                                </div>
-                            </div>
-                            
-                            ${dependents.length > 0 ? `
-                                <div class="deps-section">
-                                    <div class="deps-title">
-                                        <span style="color:#00d4aa">⬅</span>
-                                        Files that import this (<span class="count">${dependents.length}</span>)
-                                    </div>
-                                    ${dependents.slice(0, 8).map(d => `
-                                        <div class="dep-item inbound" onclick="focusFile('${d}')">
-                                            <span class="arrow">⬅</span>
-                                            <span class="name" title="${d}">${d.split('/').pop()}</span>
-                                        </div>
-                                    `).join('')}
-                                    ${dependents.length > 8 ? `<div class="empty-state">+${dependents.length - 8} more</div>` : ''}
-                                </div>
-                            ` : ''}
-                            
-                            ${dependencies.length > 0 ? `
-                                <div class="deps-section">
-                                    <div class="deps-title">
-                                        <span style="color:#f59e0b">➡</span>
-                                        Files this imports (<span class="count">${dependencies.length}</span>)
-                                    </div>
-                                    ${dependencies.slice(0, 8).map(d => `
-                                        <div class="dep-item outbound" onclick="focusFile('${d}')">
-                                            <span class="arrow">➡</span>
-                                            <span class="name" title="${d}">${d.split('/').pop()}</span>
-                                        </div>
-                                    `).join('')}
-                                    ${dependencies.length > 8 ? `<div class="empty-state">+${dependencies.length - 8} more</div>` : ''}
-                                </div>
-                            ` : ''}
-                            
-                            ${imports.length > 0 && dependencies.length === 0 ? `
-                                <div class="imports-list">
-                                    <div class="imports-title">Raw Imports (${imports.length})</div>
-                                    ${imports.slice(0, 10).map(i => `<div class="import-item">${i}</div>`).join('')}
-                                    ${imports.length > 10 ? `<div class="import-item" style="color:#666">...and ${imports.length - 10} more</div>` : ''}
-                                </div>
-                            ` : ''}
-                            
-                            ${dependents.length === 0 && dependencies.length === 0 ? `
-                                <div class="empty-state" style="margin-top: 16px;">
-                                    No resolved dependencies in this view.<br>
-                                    <span style="font-size: 10px; color: #444;">
-                                        (External packages or unresolved paths)
-                                    </span>
-                                </div>
-                            ` : ''}
+                    ` : ''}
+                    
+                    ${imports.length > 0 && dependencies.length === 0 ? `
+                        <div class="imports-list">
+                            <div class="imports-title">Raw Imports (${imports.length})</div>
+                            ${imports.slice(0, 10).map(i => `<div class="import-item">${i}</div>`).join('')}
+                            ${imports.length > 10 ? `<div class="import-item" style="color:#666">...and ${imports.length - 10} more</div>` : ''}
                         </div>
-                    </div>
-                `;
-            }
+                    ` : ''}
+                    
+                    ${dependents.length === 0 && dependencies.length === 0 ? `
+                        <div class="empty-state" style="margin-top: 16px;">
+                            No resolved dependencies in this view.<br>
+                            <span style="font-size: 10px; color: #444;">
+                                (External packages or unresolved paths)
+                            </span>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            modal.classList.add('visible');
         }
         
         // Initial render
@@ -1635,10 +1473,25 @@ def get_local_ip():
         return None
 
 
+def find_available_port(start=8000, max_tries=20):
+    """Find an available port starting from start. Returns None if none found."""
+    for i in range(max_tries):
+        port = start + i
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(("0.0.0.0", port))
+                return port
+        except OSError:
+            continue
+    return None
+
+
 def start_server(html_content, port=8000):
     """Start a local web server to serve the visualization."""
     handler_class = create_handler(html_content)
-    
+    # Allow reusing the port so restarts don't leave it in TIME_WAIT
+    socketserver.TCPServer.allow_reuse_address = True
+
     # Bind to 0.0.0.0 to allow network access
     with socketserver.TCPServer(("0.0.0.0", port), handler_class) as httpd:
         local_ip = get_local_ip()
@@ -1697,14 +1550,20 @@ def main():
     if args.no_server:
         print("ℹ️  Use --output to save HTML file for deployment")
         return 0
-    
-    port = 8000
+
+    port = find_available_port(8000)
+    if port is None:
+        print("❌ Error: No available port found (tried 8000–8019). Stop other services using these ports.")
+        return 1
+    if port != 8000:
+        print(f"   Port 8000 in use, using port {port} instead.")
+
     server_thread = threading.Thread(target=start_server, args=(html, port), daemon=True)
     server_thread.start()
-    
+
     # Give server a moment to start
     time.sleep(1)
-    
+
     local_url = f'http://localhost:{port}/'
     local_ip = get_local_ip()
     network_url = f'http://{local_ip}:{port}/' if local_ip else None
