@@ -907,6 +907,15 @@ def generate_html(data: dict) -> str:
             stroke-width: 2px;
         }
         
+        .link.dep-arrow.visible {
+            stroke-dasharray: 8 8;
+            animation: dashFlow 0.8s linear infinite;
+        }
+        
+        @keyframes dashFlow {
+            to { stroke-dashoffset: -16; }
+        }
+        
         .link-arrow {
             fill: #7c3aed;
         }
@@ -1030,7 +1039,7 @@ def generate_html(data: dict) -> str:
                     <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" fill="url(#folderSilverGrad)" filter="url(#folder-glow)"/>
                 </symbol>
                 <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="#7c3aed" opacity="0.6"/>
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#06b6d4"/>
                 </marker>
                 <marker id="arrowhead-inbound" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
                     <polygon points="0 0, 10 3.5, 0 7" fill="#00d4aa"/>
@@ -1057,11 +1066,11 @@ def generate_html(data: dict) -> str:
         <div id="legend-layers"></div>
         <div class="legend-item" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(100,100,150,0.2);">
             <div class="legend-line" style="background: #00d4aa;"></div>
-            <span>Inbound (depends on selected)</span>
+            <span>Inbound</span>
         </div>
         <div class="legend-item">
             <div class="legend-line" style="background: #f59e0b;"></div>
-            <span>Outbound (selected imports)</span>
+            <span>Outbound</span>
         </div>
     </div>
     
@@ -1316,18 +1325,21 @@ def generate_html(data: dict) -> str:
         
         function updateSelection() {
             const sid = selectedNode ? selectedNode.id : null;
+            const isFileSelected = selectedNode && selectedNode.type !== 'folder';
             g.selectAll('.node')
                 .classed('selected', d => d.id === sid);
             g.selectAll('.link')
                 .classed('visible', d => {
-                    if (!sid) return false;
+                    if (!sid || !isFileSelected) return false;
                     const sourceId = d.source.id || d.source;
                     const targetId = d.target.id || d.target;
                     return sourceId === sid || targetId === sid;
                 })
-                .classed('inbound', d => (d.target.id || d.target) === sid)
-                .classed('outbound', d => (d.source.id || d.source) === sid)
+                .classed('inbound', d => isFileSelected && (d.target.id || d.target) === sid)
+                .classed('outbound', d => isFileSelected && (d.source.id || d.source) === sid)
+                .classed('dep-arrow', isFileSelected)
                 .attr('marker-end', d => {
+                    if (!isFileSelected) return 'url(#arrowhead)';
                     const sourceId = d.source.id || d.source;
                     const targetId = d.target.id || d.target;
                     if (targetId === sid) return 'url(#arrowhead-inbound)';
