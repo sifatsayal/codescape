@@ -121,6 +121,8 @@ class CodebaseAnalyzer:
             'children': [],
             'file_count': 0,
             'code_files': 0,
+            'subfolder_count': 0,
+            'direct_file_count': 0,
         }
         
         try:
@@ -140,6 +142,7 @@ class CodebaseAnalyzer:
                     folder_info['children'].append(child['path'] or child['name'])
                     folder_info['file_count'] += child['file_count']
                     folder_info['code_files'] += child['code_files']
+                    folder_info['subfolder_count'] += 1
             else:
                 if self.file_count > MAX_FILES:
                     continue
@@ -148,10 +151,17 @@ class CodebaseAnalyzer:
                 if file_info:
                     folder_info['children'].append(file_info['path'])
                     folder_info['file_count'] += 1
+                    folder_info['direct_file_count'] += 1
                     if file_info.get('is_code'):
                         folder_info['code_files'] += 1
                     self.file_count += 1
-        
+
+        # Recursive subfolder count = direct + sum of children's recursive counts
+        folder_info['recursive_subfolder_count'] = folder_info['subfolder_count']
+        for child_path in folder_info['children']:
+            if child_path in self.folders:
+                folder_info['recursive_subfolder_count'] += self.folders[child_path].get('recursive_subfolder_count', 0)
+
         self.folders[rel_path] = folder_info
         return folder_info
     
@@ -393,6 +403,9 @@ class CodebaseAnalyzer:
                 'depth': depth_from_path(path),
                 'fileCount': info['file_count'],
                 'codeFiles': info['code_files'],
+                'subfolderCount': info.get('subfolder_count', 0),
+                'recursiveSubfolderCount': info.get('recursive_subfolder_count', 0),
+                'directFileCount': info.get('direct_file_count', 0),
                 'children': info['children'],
             })
 
@@ -535,7 +548,7 @@ def generate_html(data: dict) -> str:
         #header h1 {
             font-size: 18px;
             font-weight: 600;
-            background: linear-gradient(90deg, #00d4aa, #7c3aed);
+            background: linear-gradient(90deg, #06b6d4, #7c3aed);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -555,7 +568,7 @@ def generate_html(data: dict) -> str:
         }
         
         .stat-value {
-            color: #00d4aa;
+            color: #06b6d4;
             font-weight: 600;
             font-family: 'JetBrains Mono', monospace;
         }
@@ -695,7 +708,7 @@ def generate_html(data: dict) -> str:
         }
         .details-repo-stats .stat:last-child { border-bottom: none; }
         .details-repo-stats .stat-value {
-            color: #00d4aa;
+            color: #06b6d4;
             font-weight: 600;
             font-family: 'JetBrains Mono', monospace;
         }
@@ -729,6 +742,36 @@ def generate_html(data: dict) -> str:
             margin-bottom: 16px;
             word-break: break-all;
         }
+
+        .folder-count-toggle {
+            display: flex;
+            gap: 2px;
+            margin-bottom: 12px;
+            background: rgba(20, 20, 35, 0.6);
+            border-radius: 8px;
+            padding: 2px;
+        }
+        .folder-count-toggle button {
+            flex: 1;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: transparent;
+            color: #666;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+        .folder-count-toggle button:hover {
+            color: #888;
+        }
+        .folder-count-toggle button.active {
+            background: rgba(124, 58, 237, 0.25);
+            color: #a78bfa;
+        }
         
         .file-meta {
             display: grid;
@@ -761,14 +804,18 @@ def generate_html(data: dict) -> str:
         .meta-value {
             font-size: 14px;
             font-weight: 500;
-            color: #00d4aa;
+            color: #888;
         }
         
-        .meta-value.purple {
-            color: #a78bfa;
+        .meta-value.file {
+            color: #06b6d4;
         }
         
-        .meta-value.orange {
+        .meta-value.inbound {
+            color: #22c55e;
+        }
+        
+        .meta-value.outbound {
             color: #f59e0b;
         }
         
@@ -786,7 +833,7 @@ def generate_html(data: dict) -> str:
         }
         
         .deps-title .count {
-            color: #00d4aa;
+            color: #22c55e;
             font-weight: 600;
         }
         
@@ -816,7 +863,7 @@ def generate_html(data: dict) -> str:
         }
         
         .dep-item.inbound .arrow {
-            color: #00d4aa;
+            color: #22c55e;
         }
         
         .dep-item.outbound .arrow {
@@ -937,7 +984,7 @@ def generate_html(data: dict) -> str:
         }
         
         .link.inbound {
-            stroke: #00d4aa;
+            stroke: #22c55e;
             stroke-width: 2px;
         }
         
@@ -963,41 +1010,82 @@ def generate_html(data: dict) -> str:
             position: fixed;
             bottom: 20px;
             left: 20px;
-            width: 260px;
+            width: 160px;
             background: rgba(15, 15, 25, 0.95);
-            padding: 18px 12px 18px 18px;
+            padding: 12px 14px;
             border-radius: 14px;
             border: 1px solid rgba(100, 100, 150, 0.2);
             font-size: 13px;
             transition: width 0.2s ease, padding 0.2s ease;
         }
-        #legend.collapsed {
-            width: auto;
-            padding: 10px 14px;
+        #legend.detailed-open {
+            width: 260px;
+            padding: 18px 12px 18px 18px;
         }
-        #legend.collapsed .legend-body {
+        .legend-simple {
+            display: block;
+        }
+        #legend.detailed-open .legend-simple {
             display: none;
         }
-        #legend.collapsed .legend-header {
-            margin-bottom: 0;
+        .legend-detailed {
+            display: none;
+            margin-top: 12px;
+        }
+        #legend.detailed-open .legend-detailed {
+            display: block;
+        }
+        .legend-simple-grid {
+            display: grid;
+            grid-template-columns: 32px 1fr;
+            gap: 6px 10px;
+            align-items: center;
+        }
+        .legend-simple-grid .legend-icon { width: 28px; }
+        .legend-simple-grid .legend-folder-node { width: 20px; height: 20px; }
+        .legend-simple-grid .legend-circle { width: 14px; height: 14px; }
+        .legend-simple-grid .legend-arrow { width: 40px; height: 14px; }
+        .legend-simple-grid .legend-name {
+            font-weight: 600;
+            color: #e7e7ee;
+            font-size: 12px;
+            line-height: 1.2;
+        }
+        .legend-expand-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: auto;
+            height: auto;
+            padding: 2px;
+            margin-left: auto;
+            border: none;
+            background: transparent;
+            color: #8b8b95;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: color 0.2s ease, opacity 0.2s ease;
+        }
+        .legend-expand-btn:hover {
+            color: #e7e7ee;
+            opacity: 0.9;
+        }
+        .legend-expand-btn .legend-icon-collapse {
+            display: none;
+        }
+        #legend.detailed-open .legend-expand-btn .legend-icon-expand {
+            display: none;
+        }
+        #legend.detailed-open .legend-expand-btn .legend-icon-collapse {
+            display: block;
         }
         .legend-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 10px;
-            cursor: pointer;
-            margin-bottom: 14px;
+            margin-bottom: 10px;
             user-select: none;
-        }
-        .legend-header:hover { opacity: 0.9; }
-        .legend-toggle {
-            font-size: 10px;
-            color: #8b8b95;
-            transition: transform 0.2s ease;
-        }
-        #legend.collapsed .legend-toggle {
-            transform: rotate(-90deg);
         }
         .legend-title {
             font-weight: 700;
@@ -1146,7 +1234,7 @@ def generate_html(data: dict) -> str:
                     <polygon points="0 0, 10 3.5, 0 7" fill="#06b6d4"/>
                 </marker>
                 <marker id="arrowhead-inbound" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="#00d4aa"/>
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#22c55e"/>
                 </marker>
                 <marker id="arrowhead-outbound" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
                     <polygon points="0 0, 10 3.5, 0 7" fill="#f59e0b"/>
@@ -1162,11 +1250,41 @@ def generate_html(data: dict) -> str:
     </div>
     
     <div id="legend">
-  <div class="legend-header" id="legend-toggle" title="Click to collapse or expand key">
+  <div class="legend-header">
     <span class="legend-title">Key</span>
-    <span class="legend-toggle" aria-hidden="true">▼</span>
+    <button type="button" class="legend-expand-btn" id="legend-expand-btn" title="Expand key">
+        <svg class="legend-icon-expand" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M0 0 L8 0 M0 0 L0 8"/><path d="M24 0 L16 0 M24 0 L24 8"/><path d="M24 24 L16 24 M24 24 L24 16"/><path d="M0 24 L0 16 M0 24 L8 24"/></svg>
+        <svg class="legend-icon-collapse" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6 L0 6 M6 6 L6 0"/><path d="M18 6 L24 6 M18 6 L18 0"/><path d="M18 18 L24 18 M18 18 L18 24"/><path d="M6 18 L0 18 M6 18 L6 24"/></svg>
+      </button>
   </div>
-  <div class="legend-body">
+  <div class="legend-simple">
+    <div class="legend-simple-grid">
+      <div class="legend-icon">
+        <svg class="legend-folder-node" viewBox="0 0 36 36">
+          <circle cx="18" cy="18" r="15"></circle>
+          <use href="#folder-icon" x="8" y="8" width="20" height="20"></use>
+        </svg>
+      </div>
+      <div class="legend-name">Folder node</div>
+      <div class="legend-icon">
+        <div class="legend-circle" id="legend-file-circle"></div>
+      </div>
+      <div class="legend-name">File node</div>
+      <div class="legend-icon">
+        <svg class="legend-arrow" viewBox="0 0 52 16">
+          <line x1="0" y1="8" x2="44" y2="8" stroke="#22c55e" marker-end="url(#arrowhead-inbound)"></line>
+        </svg>
+      </div>
+      <div class="legend-name">Inbound</div>
+      <div class="legend-icon">
+        <svg class="legend-arrow" viewBox="0 0 52 16">
+          <line x1="0" y1="8" x2="44" y2="8" stroke="#f59e0b" marker-end="url(#arrowhead-outbound)"></line>
+        </svg>
+      </div>
+      <div class="legend-name">Outbound</div>
+    </div>
+  </div>
+  <div class="legend-detailed legend-body">
   <div class="legend-section">
     <div class="legend-section-title">Nodes</div>
     <div class="legend-caption-top">Node size: files by PageRank importance, folders by file count.</div>
@@ -1183,7 +1301,7 @@ def generate_html(data: dict) -> str:
       </div>
 
       <div class="legend-icon">
-        <div class="legend-circle" id="legend-file-circle"></div>
+        <div class="legend-circle" id="legend-file-circle-detail"></div>
       </div>
       <div class="legend-label">
         <div class="legend-name">File node</div>
@@ -1198,7 +1316,7 @@ def generate_html(data: dict) -> str:
     <div class="legend-grid">
       <div class="legend-icon">
         <svg class="legend-arrow" viewBox="0 0 52 16">
-          <line x1="0" y1="8" x2="44" y2="8" stroke="#00d4aa" marker-end="url(#arrowhead-inbound)"></line>
+          <line x1="0" y1="8" x2="44" y2="8" stroke="#22c55e" marker-end="url(#arrowhead-inbound)"></line>
         </svg>
       </div>
       <div class="legend-label">
@@ -1240,14 +1358,19 @@ def generate_html(data: dict) -> str:
         let currentPath = '';
         let selectedNode = null;
         let simulation = null;
+        let folderCountMode = 'direct';  // 'direct' | 'recursive'
 
         const FILE_CYAN = '#06b6d4';
         const maxMetrics = graphData.maxMetrics;
 
         document.getElementById('legend-file-circle').style.background = FILE_CYAN;
+        var detailCircle = document.getElementById('legend-file-circle-detail');
+        if (detailCircle) detailCircle.style.background = FILE_CYAN;
 
-        document.getElementById('legend-toggle').addEventListener('click', function () {
-            document.getElementById('legend').classList.toggle('collapsed');
+        document.getElementById('legend-expand-btn').addEventListener('click', function () {
+            var legend = document.getElementById('legend');
+            legend.classList.toggle('detailed-open');
+            this.setAttribute('title', legend.classList.contains('detailed-open') ? 'Collapse key' : 'Expand key');
         });
 
         const width = document.getElementById('graph-container').clientWidth;
@@ -1282,12 +1405,13 @@ def generate_html(data: dict) -> str:
 
         function getNodeSize(node) {
             if (node.type === 'folder') {
-                return Math.min(30, 12 + Math.sqrt(node.fileCount || 1) * 3);
+                return Math.min(50, 12 + Math.sqrt(node.fileCount || 1) * 6.5);
             }
             const value = node.pagerank || 0;
             const maxValue = maxMetrics.pagerank || 1;
             const normalized = Math.sqrt(value) / Math.sqrt(maxValue || 1);
-            return Math.max(6, Math.min(24, 6 + normalized * 18));
+            const curved = Math.pow(normalized, 0.55);
+            return Math.max(6, Math.min(48, 6 + curved * 42));
         }
         
         function navigateTo(path, clearPanel) {
@@ -1506,6 +1630,11 @@ def generate_html(data: dict) -> str:
             return String(s).replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "\\\\'");
         }
 
+        function setFolderCountMode(mode) {
+            folderCountMode = mode;
+            renderSidePanel();
+        }
+
         function getCardHTML(node) {
             const esc = escapeAttr;
             if (node.type === 'folder') {
@@ -1518,15 +1647,21 @@ def generate_html(data: dict) -> str:
                         <div class="file-info">
                             <div class="file-name"><svg class="sidebar-icon" viewBox="0 0 24 24"><use href="#folder-icon"/></svg><span>${esc(node.name)}</span></div>
                             <div class="file-path">${esc(node.path || '/')}</div>
+                            <div class="folder-count-toggle">
+                                <button type="button" class="${folderCountMode === 'direct' ? 'active' : ''}" onclick="setFolderCountMode('direct')">Direct</button>
+                                <button type="button" class="${folderCountMode === 'recursive' ? 'active' : ''}" onclick="setFolderCountMode('recursive')">Recursive</button>
+                            </div>
                             <div class="file-meta">
                                 <div class="meta-item">
-                                    <div class="meta-label">Files</div>
-                                    <div class="meta-value">${node.fileCount || 0}</div>
+                                    <div class="meta-label" style="color:#7c3aed">Subfolders</div>
+                                    <div class="meta-value" style="color:#7c3aed">${folderCountMode === 'direct' ? (node.subfolderCount ?? 0) : (node.recursiveSubfolderCount ?? 0)}</div>
                                 </div>
+                                ${(node.fileCount ?? 0) > 0 ? `
                                 <div class="meta-item">
-                                    <div class="meta-label">Code Files</div>
-                                    <div class="meta-value">${node.codeFiles || 0}</div>
+                                    <div class="meta-label" style="color:#06b6d4">Files</div>
+                                    <div class="meta-value" style="color:#06b6d4">${folderCountMode === 'direct' ? (node.directFileCount ?? 0) : (node.fileCount ?? 0)}</div>
                                 </div>
+                                ` : ''}
                             </div>
                         </div>
                     </div>
@@ -1547,25 +1682,25 @@ def generate_html(data: dict) -> str:
                         <div class="file-meta four-col">
                             <div class="meta-item">
                                 <div class="meta-label">Language</div>
-                                <div class="meta-value">${esc(node.language || '')}</div>
+                                <div class="meta-value file">${esc(node.language || '')}</div>
                             </div>
                             <div class="meta-item">
                                 <div class="meta-label">Lines</div>
-                                <div class="meta-value">${node.loc != null ? node.loc.toLocaleString() : 0}</div>
+                                <div class="meta-value file">${node.loc != null ? node.loc.toLocaleString() : 0}</div>
                             </div>
                             <div class="meta-item highlight">
                                 <div class="meta-label">Fan-In</div>
-                                <div class="meta-value purple">${node.fanIn ?? 0}</div>
+                                <div class="meta-value inbound">${node.fanIn ?? 0}</div>
                             </div>
                             <div class="meta-item highlight">
                                 <div class="meta-label">Fan-Out</div>
-                                <div class="meta-value orange">${node.fanOut ?? 0}</div>
+                                <div class="meta-value outbound">${node.fanOut ?? 0}</div>
                             </div>
                         </div>
                         ${dependents.length > 0 ? `
                             <div class="deps-section">
                                 <div class="deps-title">
-                                    <span style="color:#00d4aa">⬅</span>
+                                    <span style="color:#22c55e">⬅</span>
                                     Files that import this (<span class="count">${dependents.length}</span>)
                                 </div>
                                 ${dependents.slice(0, 8).map(d => `
