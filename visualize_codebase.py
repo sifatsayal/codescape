@@ -392,9 +392,19 @@ class CodebaseAnalyzer:
             """Depth = number of path segments (root = 0)."""
             return len([p for p in (path or '').split('/') if p])
 
+        # Folder-level importance = sum of PageRank of all files in folder (recursively)
+        folder_pagerank: Dict[str, float] = {}
+        for folder_path in self.folders:
+            total = 0.0
+            for file_path in self.files:
+                if folder_path == '' or file_path.startswith(folder_path + '/'):
+                    total += self.pagerank.get(file_path, 0)
+            folder_pagerank[folder_path] = total
+
         # Add folder nodes
         for path, info in self.folders.items():
             node_id = path or 'root'
+            agg_pr = folder_pagerank.get(path, 0)
             nodes.append({
                 'id': node_id,
                 'name': info['name'],
@@ -407,6 +417,7 @@ class CodebaseAnalyzer:
                 'recursiveSubfolderCount': info.get('recursive_subfolder_count', 0),
                 'directFileCount': info.get('direct_file_count', 0),
                 'children': info['children'],
+                'pagerank': round(agg_pr * 10000, 2),
             })
 
         # Add file nodes with metrics
@@ -474,10 +485,12 @@ class CodebaseAnalyzer:
                 'explanation': explanation,
             })
         
-        # Compute max values for normalization
+        # Compute max values for normalization (files and folders use same PageRank scale)
         max_fan_in = max((self.fan_in.get(p, 0) for p in self.files), default=1) or 1
         max_fan_out = max((self.fan_out.get(p, 0) for p in self.files), default=1) or 1
-        max_pagerank = max((self.pagerank.get(p, 0) for p in self.files), default=0.0001) or 0.0001
+        max_file_pr = max((self.pagerank.get(p, 0) for p in self.files), default=0)
+        max_folder_pr = max(folder_pagerank.values(), default=0)
+        max_pagerank = max(max_file_pr, max_folder_pr, 0.0001)
         
         max_depth = max((n.get('depth', 0) for n in nodes), default=0)
 
@@ -793,6 +806,20 @@ def generate_html(data: dict) -> str:
             background: rgba(124, 58, 237, 0.15);
             border: 1px solid rgba(124, 58, 237, 0.3);
         }
+        .meta-item.highlight-inbound {
+            background: rgba(34, 197, 94, 0.15);
+            border: 1px solid rgba(34, 197, 94, 0.35);
+        }
+        .meta-item.highlight-inbound .meta-value {
+            color: #22c55e;
+        }
+        .meta-item.highlight-outbound {
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.35);
+        }
+        .meta-item.highlight-outbound .meta-value {
+            color: #f59e0b;
+        }
         
         .meta-label {
             font-size: 10px;
@@ -883,7 +910,8 @@ def generate_html(data: dict) -> str:
         
         .imports-title {
             font-size: 12px;
-            color: #888;
+            color: #f59e0b;
+            font-weight: 600;
             margin-bottom: 8px;
         }
         
@@ -891,10 +919,9 @@ def generate_html(data: dict) -> str:
             font-size: 12px;
             font-family: 'JetBrains Mono', monospace;
             padding: 6px 10px;
-            background: rgba(124, 58, 237, 0.1);
             border-radius: 6px;
             margin-bottom: 4px;
-            color: #a78bfa;
+            color: #fbbf24;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -1287,7 +1314,7 @@ def generate_html(data: dict) -> str:
   <div class="legend-detailed legend-body">
   <div class="legend-section">
     <div class="legend-section-title">Nodes</div>
-    <div class="legend-caption-top">Node size: files by PageRank importance, folders by file count.</div>
+    <div class="legend-caption-top">Node size: PageRank-derived importance.</div>
     <div class="legend-grid">
       <div class="legend-icon">
         <svg class="legend-folder-node" viewBox="0 0 36 36">
@@ -1404,14 +1431,12 @@ def generate_html(data: dict) -> str:
         }
 
         function getNodeSize(node) {
-            if (node.type === 'folder') {
-                return Math.min(50, 12 + Math.sqrt(node.fileCount || 1) * 6.5);
-            }
-            const value = node.pagerank || 0;
-            const maxValue = maxMetrics.pagerank || 1;
-            const normalized = Math.sqrt(value) / Math.sqrt(maxValue || 1);
-            const curved = Math.pow(normalized, 0.55);
-            return Math.max(6, Math.min(48, 6 + curved * 42));
+            const value = Math.max(node.pagerank || 0, 0.01);
+            const maxValue = Math.max(maxMetrics.pagerank || 1, 0.01);
+            const normalized = Math.sqrt(value) / Math.sqrt(maxValue);
+            // Linear mapping so size differences are obvious: radius 6 (low) to 50 (high)
+            const radius = 6 + normalized * 44;
+            return Math.max(6, Math.min(50, radius));
         }
         
         function navigateTo(path, clearPanel) {
@@ -1688,13 +1713,13 @@ def generate_html(data: dict) -> str:
                                 <div class="meta-label">Lines</div>
                                 <div class="meta-value file">${node.loc != null ? node.loc.toLocaleString() : 0}</div>
                             </div>
-                            <div class="meta-item highlight">
+                            <div class="meta-item highlight-inbound">
                                 <div class="meta-label">Fan-In</div>
-                                <div class="meta-value inbound">${node.fanIn ?? 0}</div>
+                                <div class="meta-value">${node.fanIn ?? 0}</div>
                             </div>
-                            <div class="meta-item highlight">
+                            <div class="meta-item highlight-outbound">
                                 <div class="meta-label">Fan-Out</div>
-                                <div class="meta-value outbound">${node.fanOut ?? 0}</div>
+                                <div class="meta-value">${node.fanOut ?? 0}</div>
                             </div>
                         </div>
                         ${dependents.length > 0 ? `
@@ -1736,8 +1761,7 @@ def generate_html(data: dict) -> str:
                         ` : ''}
                         ${dependents.length === 0 && dependencies.length === 0 ? `
                             <div class="empty-state" style="margin-top: 16px;">
-                                No resolved dependencies in this view.<br>
-                                <span style="font-size: 10px; color: #444;">(External packages or unresolved paths)</span>
+                                No resolved dependencies in this view.
                             </div>
                         ` : ''}
                     </div>
