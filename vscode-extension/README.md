@@ -1,0 +1,134 @@
+# Codebase Visualizer - VS Code Extension
+
+VS Code extension for visualizing codebase structure, dependencies, and architectural patterns.
+
+## Features
+
+- **Visualize Codebase** - Generate interactive dependency graphs
+- **Two Modes:**
+  - **External Browser** - Opens visualization in your default browser
+  - **Embedded Panel** - Shows visualization directly in VS Code
+- **File Navigation** - Click nodes in visualization to open files in IDE
+- **Real-time Analysis** - Analyzes your workspace on-demand
+
+## Requirements
+
+- Python 3.11+ installed and available in PATH
+- The `visualizer` Python package (should be in parent directory of extension)
+
+## Installation
+
+1. Clone this repository
+2. Open the `vscode-extension` folder in VS Code
+3. Run `npm install` to install dependencies
+4. Press `F5` to launch extension development host
+   - If prompted, select **"VS Code Extension Development"** from the debugger dropdown
+   - This will open a new VS Code window (Extension Development Host)
+5. Or package with `vsce package` and install the `.vsix` file
+
+## Quick Start (Development)
+
+1. **Install dependencies:**
+   ```bash
+   cd vscode-extension
+   npm install
+   ```
+
+2. **Compile TypeScript:**
+   ```bash
+   npm run compile
+   ```
+
+3. **Run extension:**
+   - Press `F5` (or select "Run Extension" from debug dropdown)
+   - A new VS Code window opens (Extension Development Host)
+   - Open a workspace folder in that window
+   - Run command: `Cmd+Shift+P` → "Visualize Codebase"
+
+## Usage
+
+### Command Palette
+
+1. Open Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`)
+2. Run one of:
+   - **"Codebase Visualizer: Visualize Codebase"** - Opens in external browser
+   - **"Codebase Visualizer: Visualize Codebase (Embedded)"** - Shows in VS Code panel
+
+### Configuration
+
+Add to your VS Code settings:
+
+```json
+{
+  "codebaseVisualizer.pythonPath": "python3",
+  "codebaseVisualizer.autoOpen": true
+}
+```
+
+## Architecture
+
+### Phase 1: External Browser (Implemented)
+- Spawns Python visualizer server
+- Opens browser with visualization
+- Deep linking back to IDE for file navigation
+
+### Phase 2: Embedded Webview (Implemented)
+- Creates webview panel in VS Code
+- Embeds D3.js visualization
+- Click nodes to open files in IDE
+
+### Phase 3: Advanced Features (Future)
+- Real-time updates on file changes
+- Code lens integration
+- Sidebar dependency explorer
+
+## Development
+
+### Project Structure
+
+```
+vscode-extension/
+├── src/
+│   ├── extension.ts          # Main extension entry point
+│   ├── pythonBridge.ts       # Python process communication
+│   └── webviewPanel.ts       # Webview panel management
+├── package.json              # Extension manifest
+└── tsconfig.json             # TypeScript configuration
+```
+
+### Building
+
+```bash
+npm install
+npm run compile
+```
+
+### Testing
+
+1. Press `F5` in VS Code to launch extension development host
+2. Open a workspace folder
+3. Run "Visualize Codebase" command
+
+## Troubleshooting
+
+### Python Not Found
+
+Set the correct Python path in settings:
+```json
+{
+  "codebaseVisualizer.pythonPath": "/usr/local/bin/python3"
+}
+```
+
+### Visualizer Package Not Found
+
+Ensure the `visualizer` Python package is in the parent directory:
+```
+project-root/
+├── visualizer/          # Python package
+└── vscode-extension/    # VS Code extension
+```
+
+## License
+
+Same as main project (MIT)
