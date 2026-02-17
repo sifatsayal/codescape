@@ -1,0 +1,57 @@
+{
+  "name": "codebase-visualizer",
+  "displayName": "Codebase Visualizer",
+  "description": "Visualize codebase structure, dependencies, and architectural patterns",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:codebaseVisualizer.visualize"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codebaseVisualizer.visualize",
+        "title": "Visualize Codebase",
+        "category": "Codebase Visualizer"
+      },
+      {
+        "command": "codebaseVisualizer.visualizeInPanel",
+        "title": "Visualize Codebase (Embedded)",
+        "category": "Codebase Visualizer"
+      }
+    ],
+    "configuration": {
+      "title": "Codebase Visualizer",
+      "properties": {
+        "codebaseVisualizer.pythonPath": {
+          "type": "string",
+          "default": "python3",
+          "description": "Path to Python executable (python3, python, or full path)"
+        },
+        "codebaseVisualizer.autoOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically open browser when visualization is ready"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.74.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {}
+}
