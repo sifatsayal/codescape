@@ -126,6 +126,55 @@ def generate_html(data: dict) -> str:
         .breadcrumb-file {
             color: #06b6d4;
         }
+
+        .header-load-repo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 16px;
+        }
+        .header-load-repo input {
+            width: 200px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(100, 100, 150, 0.3);
+            background: rgba(30, 30, 50, 0.8);
+            color: #e0e0e0;
+        }
+        .header-load-repo input::placeholder {
+            color: #666;
+        }
+        .header-load-repo input:focus {
+            outline: none;
+            border-color: #7c3aed;
+        }
+        .header-load-repo button {
+            font-size: 12px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(124, 58, 237, 0.5);
+            background: rgba(124, 58, 237, 0.25);
+            color: #c4b5fd;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .header-load-repo button:hover:not(:disabled) {
+            background: rgba(124, 58, 237, 0.4);
+        }
+        .header-load-repo button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .header-load-repo button.browse-btn {
+            border-color: rgba(6, 182, 212, 0.5);
+            background: rgba(6, 182, 212, 0.2);
+            color: #67e8f9;
+        }
+        .header-load-repo button.browse-btn:hover:not(:disabled) {
+            background: rgba(6, 182, 212, 0.35);
+        }
         
         #graph-container {
             position: fixed;
@@ -349,6 +398,9 @@ def generate_html(data: dict) -> str:
             color: #22c55e;
             font-weight: 600;
         }
+        .deps-section.outbound .deps-title .count {
+            color: #f59e0b;
+        }
         
         .dep-item {
             font-size: 12px;
@@ -370,16 +422,16 @@ def generate_html(data: dict) -> str:
             color: #e0e0e0;
         }
         
-        .dep-item .arrow {
-            font-size: 10px;
-            color: #555;
+        .dep-item .dep-item-icon {
+            font-size: 12px;
+            flex-shrink: 0;
         }
         
-        .dep-item.inbound .arrow {
+        .dep-item.inbound .dep-item-icon {
             color: #22c55e;
         }
         
-        .dep-item.outbound .arrow {
+        .dep-item.outbound .dep-item-icon {
             color: #f59e0b;
         }
         
@@ -388,6 +440,33 @@ def generate_html(data: dict) -> str:
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+        
+        .dep-item.inbound .name {
+            color: #22c55e;
+        }
+        
+        .dep-item.outbound .name {
+            color: #f59e0b;
+        }
+        
+        .dep-item-location-chip {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: #666;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(0,0,0,0.2);
+            max-width: 140px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .dep-item.dep-item-outside .dep-item-location-chip {
+            margin-left: auto;
+            background: rgba(124, 58, 237, 0.35);
+            color: #c4b5fd;
         }
         
         .imports-list {
@@ -714,6 +793,11 @@ def generate_html(data: dict) -> str:
 <body>
     <div id="header">
         <h1>⬡ Codescape</h1>
+        <div class="header-load-repo">
+            <input type="text" id="load-repo-path" placeholder="Path to repo" title="Enter a folder path or click Browse" />
+            <button type="button" id="load-repo-browse-btn" class="browse-btn" title="Choose folder on your computer">Browse</button>
+            <button type="button" id="load-repo-btn">Load repo</button>
+        </div>
         <div class="breadcrumb" id="breadcrumb">
             <span class="breadcrumb-item" onclick="navigateTo('', true)">''' + data['rootName'] + '''</span>
         </div>
@@ -858,15 +942,19 @@ def generate_html(data: dict) -> str:
     </div>
 
     <script>
-        const graphData = ''' + json.dumps(data) + ''';
+        let graphData = ''' + json.dumps(data) + ''';
         
-        // Build lookup maps
-        const nodesById = new Map(graphData.nodes.map(n => [n.id, n]));
-        const linksMap = new Map(); // source -> target -> link
-        graphData.links.forEach(l => {
-            if (!linksMap.has(l.source)) linksMap.set(l.source, new Map());
-            linksMap.get(l.source).set(l.target, l);
-        });
+        // Build lookup maps (rebuilt when loading a new repo)
+        let nodesById = new Map(graphData.nodes.map(n => [n.id, n]));
+        let linksMap = new Map(); // source -> target -> link
+        function rebuildLinksMap() {
+            linksMap.clear();
+            graphData.links.forEach(l => {
+                if (!linksMap.has(l.source)) linksMap.set(l.source, new Map());
+                linksMap.get(l.source).set(l.target, l);
+            });
+        }
+        rebuildLinksMap();
         
         let currentPath = '';
         let selectedNode = null;
@@ -874,7 +962,38 @@ def generate_html(data: dict) -> str:
         let folderCountMode = 'direct';  // 'direct' | 'recursive'
 
         const FILE_CYAN = '#06b6d4';
-        const maxMetrics = graphData.maxMetrics;
+        let maxMetrics = graphData.maxMetrics;
+
+        function updateGraphData(newData) {
+            graphData = newData;
+            maxMetrics = graphData.maxMetrics || {};
+            nodesById = new Map(graphData.nodes.map(n => [n.id, n]));
+            rebuildLinksMap();
+            currentPath = '';
+            selectedNode = null;
+            updateBreadcrumb();
+            renderGraph();
+            updateSelection();
+            renderSidePanel();
+        }
+
+        async function loadRepo() {
+            const pathInput = document.getElementById('load-repo-path');
+            const path = (pathInput && pathInput.value) ? pathInput.value.trim() : '';
+            if (!path) return;
+            const btn = document.getElementById('load-repo-btn');
+            if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+            try {
+                const resp = await fetch('/api/load?path=' + encodeURIComponent(path));
+                const data = await resp.json();
+                if (data.error) { alert(data.error); return; }
+                updateGraphData(data);
+            } catch (e) {
+                alert('Failed to load repo: ' + e.message);
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = 'Load repo'; }
+            }
+        }
 
         document.getElementById('legend-file-circle').style.background = FILE_CYAN;
         var detailCircle = document.getElementById('legend-file-circle-detail');
@@ -884,6 +1003,29 @@ def generate_html(data: dict) -> str:
             var legend = document.getElementById('legend');
             legend.classList.toggle('detailed-open');
             this.setAttribute('title', legend.classList.contains('detailed-open') ? 'Collapse key' : 'Expand key');
+        });
+
+        const loadRepoBtn = document.getElementById('load-repo-btn');
+        const loadRepoPath = document.getElementById('load-repo-path');
+        if (loadRepoBtn) loadRepoBtn.addEventListener('click', loadRepo);
+        if (loadRepoPath) loadRepoPath.addEventListener('keydown', function (e) { if (e.key === 'Enter') loadRepo(); });
+        const browseBtn = document.getElementById('load-repo-browse-btn');
+        if (browseBtn) browseBtn.addEventListener('click', async function () {
+            browseBtn.disabled = true;
+            browseBtn.textContent = 'Opening…';
+            try {
+                const resp = await fetch('/api/browse');
+                const data = await resp.json();
+                if (data.path && loadRepoPath) {
+                    loadRepoPath.value = data.path;
+                    loadRepo();
+                }
+            } catch (e) {
+                alert('Browse failed: ' + e.message);
+            } finally {
+                browseBtn.disabled = false;
+                browseBtn.textContent = 'Browse';
+            }
         });
 
         const width = document.getElementById('graph-container').clientWidth;
@@ -1141,6 +1283,59 @@ def generate_html(data: dict) -> str:
             return String(s).replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "\\\\'");
         }
 
+        function partitionDeps(currentFolderPath, paths) {
+            const inScope = [];
+            const outOfScope = [];
+            for (const p of paths) {
+                const parentDir = p.split('/').slice(0, -1).join('/');
+                if (parentDir === currentFolderPath) inScope.push(p);
+                else outOfScope.push(p);
+            }
+            return { inScope, outOfScope };
+        }
+
+        function compactLocationChip(path, currentFolderPath) {
+            // currentFolderPath = folder currently shown in the canvas (view scope).
+            const depDirSegs = path.split('/').filter(Boolean).slice(0, -1);
+            if (depDirSegs.length === 0) return '(root)';
+            const selectedDirSegs = (currentFolderPath || '').split('/').filter(Boolean);
+            // Within-folder: dep's parent is inside or equal to current folder → show relative subpath only.
+            const isPrefix = selectedDirSegs.length <= depDirSegs.length &&
+                selectedDirSegs.every((seg, i) => depDirSegs[i] === seg);
+            if (isPrefix) {
+                const subpath = depDirSegs.slice(selectedDirSegs.length);
+                return subpath.length ? subpath.join(' › ') : '(same folder)';
+            }
+            // Outside: anchor at LCP and show path down to dep's parent (full path from root).
+            return depDirSegs.join(' › ');
+        }
+
+        function renderInternalDepSection(paths, currentFolderPath, direction) {
+            if (!paths || paths.length === 0) return '';
+            const { inScope, outOfScope } = partitionDeps(currentFolderPath, paths);
+            const arrow = direction === 'inbound' ? '⬅' : '➡';
+            const cls = direction === 'inbound' ? 'inbound' : 'outbound';
+            const allItems = [...inScope.map(p => ({ path: p, inFolder: true })), ...outOfScope.map(p => ({ path: p, inFolder: false }))];
+            const show = allItems.slice(0, 20);
+            let html = show.map(({ path: p, inFolder }) => {
+                const name = p.split('/').pop();
+                if (inFolder) {
+                    return `<div class="dep-item ${cls}" onclick="focusFile('${escJs(p)}')">
+                        <span class="dep-item-icon" aria-hidden="true">•</span>
+                        <span class="name" title="${escapeAttr(p)}">${escapeAttr(name)}</span>
+                    </div>`;
+                }
+                const locChip = compactLocationChip(p, currentFolderPath);
+                return `<div class="dep-item ${cls} dep-item-outside" onclick="focusFile('${escJs(p)}')">
+                    <span class="dep-item-icon" aria-hidden="true">${arrow}</span>
+                    <span class="name dep-item-name-clickable" title="${escapeAttr(p)}">${escapeAttr(name)}</span>
+                    <span class="dep-item-location-chip" title="${escapeAttr(p)}">${escapeAttr(locChip)}</span>
+                </div>`;
+            }).join('');
+            if (allItems.length > 20) html += `<div class="empty-state">+${allItems.length - 20} more</div>`;
+            return html;
+        }
+
         function setFolderCountMode(mode) {
             folderCountMode = mode;
             renderSidePanel();
@@ -1181,6 +1376,7 @@ def generate_html(data: dict) -> str:
             const dependents = node.dependents || [];
             const dependencies = node.dependencies || [];
             const imports = node.imports || [];
+            const currentFolderPath = (node.path || '').split('/').slice(0, -1).join('/');
             return `
                 <div class="sidebar-section" data-node-id="${esc(node.id)}">
                     <div class="sidebar-title">
@@ -1211,31 +1407,17 @@ def generate_html(data: dict) -> str:
                         ${dependents.length > 0 ? `
                             <div class="deps-section">
                                 <div class="deps-title">
-                                    <span style="color:#22c55e">⬅</span>
                                     Files that import this (<span class="count">${dependents.length}</span>)
                                 </div>
-                                ${dependents.slice(0, 8).map(d => `
-                                    <div class="dep-item inbound" onclick="focusFile('${escJs(d)}')">
-                                        <span class="arrow">⬅</span>
-                                        <span class="name" title="${esc(d)}">${esc(d.split('/').pop())}</span>
-                                    </div>
-                                `).join('')}
-                                ${dependents.length > 8 ? `<div class="empty-state">+${dependents.length - 8} more</div>` : ''}
+                                ${renderInternalDepSection(dependents, currentFolderPath, 'inbound')}
                             </div>
                         ` : ''}
                         ${dependencies.length > 0 ? `
-                            <div class="deps-section">
+                            <div class="deps-section outbound">
                                 <div class="deps-title">
-                                    <span style="color:#f59e0b">➡</span>
                                     Files this imports (<span class="count">${dependencies.length}</span>)
                                 </div>
-                                ${dependencies.slice(0, 8).map(d => `
-                                    <div class="dep-item outbound" onclick="focusFile('${escJs(d)}')">
-                                        <span class="arrow">➡</span>
-                                        <span class="name" title="${esc(d)}">${esc(d.split('/').pop())}</span>
-                                    </div>
-                                `).join('')}
-                                ${dependencies.length > 8 ? `<div class="empty-state">+${dependencies.length - 8} more</div>` : ''}
+                                ${renderInternalDepSection(dependencies, currentFolderPath, 'outbound')}
                             </div>
                         ` : ''}
                         ${imports.length > 0 && dependencies.length === 0 ? `
