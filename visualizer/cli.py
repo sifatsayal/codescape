@@ -23,6 +23,27 @@ from .ui import generate_html
 from .server import start_server, find_available_port, get_local_ip
 
 
+def build_graph_data_for_path(repo_path_str: str):
+    """Build graph data for a given repo path. Used by the in-app 'Load repo' API.
+    Returns a dict (graph data) or a dict with 'error' key on failure."""
+    repo_path = Path(repo_path_str).resolve()
+    if not repo_path.exists():
+        return {"error": f"Path does not exist: {repo_path}"}
+    if not repo_path.is_dir():
+        return {"error": "Path must be a directory"}
+    try:
+        config = VisualizerConfig.load_for_repo(repo_path)
+        scanner = RepoScanner(config)
+        scan_result = scanner.scan()
+        files = scan_result['files']
+        folders = scan_result['folders']
+        imports = extract_imports_from_files(files, config.repo_path, config)
+        graph = DependencyGraph(config, files, folders, imports)
+        return graph.build()
+    except Exception as e:
+        return {"error": str(e)}
+
+
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -175,8 +196,13 @@ Examples:
         if port != 8000:
             print(f"   Port 8000 in use, using port {port} instead.")
     
-    # Start server
-    server_thread = threading.Thread(target=start_server, args=(html, port), daemon=True)
+    # Start server with load-repo API so the UI can load another repo
+    server_thread = threading.Thread(
+        target=start_server,
+        args=(html, port),
+        kwargs={"load_repo_callback": build_graph_data_for_path},
+        daemon=True,
+    )
     server_thread.start()
     
     # Give server a moment to start

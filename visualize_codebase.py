@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-Legacy entry point for codebase visualizer.
+Entry point for codebase visualizer.
 
-This file is a compatibility wrapper. For new usage, prefer:
+Run with no arguments to visualize the current directory:
+    python visualize_codebase.py
+
+Use the "Load repo" control in the top nav to open another repo by path.
+You can also run with an explicit repo:
     python -m visualizer --repo <path>
-
-This wrapper redirects to the new visualizer package.
 """
 
 import sys
