@@ -31,51 +31,57 @@ export interface PythonBridgeOptions {
 export class PythonBridge {
   private pythonPath: string;
   private visualizerPath: string;
+  /** Workspace root (parent of visualizer/) - use as cwd so "python -m visualizer" works */
+  private workspaceRoot: string;
 
   constructor(pythonPath: string) {
     this.pythonPath = pythonPath;
-    // Find visualizer package relative to extension
-    const extensionRoot = path.resolve(__dirname, '../../..');
-    this.visualizerPath = path.join(extensionRoot, 'visualizer');
+    // Extension compiled output is in vscode-extension/out/; repo root is parent of vscode-extension
+    const repoRoot = path.resolve(__dirname, '../..');
+    this.visualizerPath = path.join(repoRoot, 'visualizer');
+    this.workspaceRoot = repoRoot;
   }
 
   /**
-   * Check if Python is available and visualizer package exists
+   * Check if Python is available and visualizer can run.
+   * If visualizerRepoPath is set, check that path has visualizer/. Else check pip-installed (python -m visualizer).
    */
-  async checkEnvironment(): Promise<{ available: boolean; error?: string }> {
+  async checkEnvironment(visualizerRepoPath?: string): Promise<{ available: boolean; error?: string }> {
     return new Promise((resolve) => {
-      const process = spawn(this.pythonPath, ['--version']);
-      let output = '';
-      let error = '';
+      const proc = spawn(this.pythonPath, ['--version']);
+      let err = '';
 
-      process.stdout.on('data', (data) => {
-        output += data.toString();
-      });
-
-      process.stderr.on('data', (data) => {
-        error += data.toString();
-      });
-
-      process.on('close', (code) => {
+      proc.stderr.on('data', (data) => { err += data.toString(); });
+      proc.on('close', (code) => {
         if (code !== 0) {
-          resolve({
-            available: false,
-            error: `Python not found at ${this.pythonPath}. ${error}`,
-          });
+          resolve({ available: false, error: `Python not found at ${this.pythonPath}. ${err}` });
           return;
         }
 
-        // Check if visualizer package exists
-        const visualizerInit = path.join(this.visualizerPath, '__init__.py');
-        if (!fs.existsSync(visualizerInit)) {
-          resolve({
-            available: false,
-            error: `Visualizer package not found at ${this.visualizerPath}`,
-          });
+        if (visualizerRepoPath) {
+          const initPath = path.join(visualizerRepoPath, 'visualizer', '__init__.py');
+          if (!fs.existsSync(initPath)) {
+            resolve({ available: false, error: `Visualizer not found at ${visualizerRepoPath}. Set the path to the folder that contains visualize_codebase.py and the visualizer/ folder.` });
+            return;
+          }
+          resolve({ available: true });
           return;
         }
 
-        resolve({ available: true });
+        // Check if visualizer is pip-installed
+        const checkProc = spawn(this.pythonPath, ['-c', 'import visualizer'], { stdio: ['ignore', 'pipe', 'pipe'] });
+        let checkErr = '';
+        checkProc.stderr.on('data', (d) => { checkErr += d.toString(); });
+        checkProc.on('close', (c) => {
+          if (c !== 0) {
+            resolve({
+              available: false,
+              error: "Visualizer not installed. Open the win26-Team22 folder and run: pip install -e .",
+            });
+            return;
+          }
+          resolve({ available: true });
+        });
       });
     });
   }
@@ -85,7 +91,8 @@ export class PythonBridge {
    */
   async analyzeRepository(
     repoPath: string,
-    configPath?: string
+    configPath?: string,
+    visualizerRepoPath?: string
   ): Promise<GraphData> {
     return new Promise((resolve, reject) => {
       const args = ['-m', 'visualizer', '--repo', repoPath, '--json'];
@@ -93,8 +100,10 @@ export class PythonBridge {
         args.push('--config', configPath);
       }
 
+      const cwd = visualizerRepoPath || this.workspaceRoot;
+
       const process = spawn(this.pythonPath, args, {
-        cwd: this.visualizerPath,
+        cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
 
@@ -158,12 +167,14 @@ export class PythonBridge {
   }
 
   /**
-   * Start Python visualizer server and return port
+   * Start Python visualizer server and return port.
+   * repoPath = folder to visualize (current workspace). visualizerRepoPath = path to win26-Team22 if not pip-installed.
    */
   async startServer(
     repoPath: string,
     configPath?: string,
-    port?: number
+    port?: number,
+    visualizerRepoPath?: string
   ): Promise<{ port: number; process: ChildProcess }> {
     return new Promise((resolve, reject) => {
       const args = ['-m', 'visualizer', '--repo', repoPath];
@@ -174,8 +185,10 @@ export class PythonBridge {
         args.push('--config', configPath);
       }
 
+      const cwd = visualizerRepoPath || repoPath;
+
       const process = spawn(this.pythonPath, args, {
-        cwd: this.visualizerPath,
+        cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
 
@@ -215,7 +228,8 @@ export class PythonBridge {
   async generateHTML(
     repoPath: string,
     outputPath: string,
-    configPath?: string
+    configPath?: string,
+    visualizerRepoPath?: string
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       const args = [
@@ -231,8 +245,10 @@ export class PythonBridge {
         args.push('--config', configPath);
       }
 
+      const cwd = visualizerRepoPath || this.workspaceRoot;
+
       const process = spawn(this.pythonPath, args, {
-        cwd: this.visualizerPath,
+        cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
 

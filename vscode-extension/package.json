@@ -11,7 +11,7 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:codebaseVisualizer.visualize"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -39,6 +39,11 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically open browser when visualization is ready"
+        },
+        "codebaseVisualizer.visualizerRepoPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the visualizer repo (win26-Team22) if not pip-installed. Leave empty if you ran 'pip install -e .' from that repo."
         }
       }
     }

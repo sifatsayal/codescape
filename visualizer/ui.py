@@ -1028,6 +1028,16 @@ def generate_html(data: dict) -> str:
             }
         });
 
+        // If URL has ?path=..., auto-load that folder (e.g. from Cursor or shared link)
+        (function () {
+            const params = new URLSearchParams(window.location.search);
+            const pathParam = params.get('path');
+            if (pathParam && loadRepoPath) {
+                loadRepoPath.value = pathParam;
+                loadRepo();
+            }
+        })();
+
         const width = document.getElementById('graph-container').clientWidth;
         const height = document.getElementById('graph-container').clientHeight;
         

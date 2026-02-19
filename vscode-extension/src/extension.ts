@@ -10,7 +10,7 @@ let webviewPanel: WebviewPanel | null = null;
 export function activate(context: vscode.ExtensionContext) {
   console.log('Codebase Visualizer extension is now active');
 
-  // Get Python path from configuration
+  // Get Python path from configuration (config read again in commands for latest value)
   const config = vscode.workspace.getConfiguration('codebaseVisualizer');
   const pythonPath = config.get<string>('pythonPath', 'python3');
 
@@ -62,6 +62,8 @@ async function visualizeInBrowser(context: vscode.ExtensionContext) {
   }
 
   const repoPath = workspaceFolder.uri.fsPath;
+  const config = vscode.workspace.getConfiguration('codebaseVisualizer');
+  const visualizerRepoPath = config.get<string>('visualizerRepoPath', '')?.trim() || undefined;
 
   // Check Python environment
   const statusBarItem = vscode.window.createStatusBarItem(
@@ -72,7 +74,7 @@ async function visualizeInBrowser(context: vscode.ExtensionContext) {
   statusBarItem.show();
 
   try {
-    const envCheck = await pythonBridge.checkEnvironment();
+    const envCheck = await pythonBridge.checkEnvironment(visualizerRepoPath);
     if (!envCheck.available) {
       statusBarItem.dispose();
       vscode.window.showErrorMessage(
@@ -84,8 +86,8 @@ async function visualizeInBrowser(context: vscode.ExtensionContext) {
     statusBarItem.text = '$(sync~spin) Starting visualizer server...';
     statusBarItem.show();
 
-    // Start Python server
-    const { port, process } = await pythonBridge.startServer(repoPath);
+    // Start Python server (visualizes repoPath = current workspace folder)
+    const { port, process } = await pythonBridge.startServer(repoPath, undefined, undefined, visualizerRepoPath);
 
     statusBarItem.text = '$(check) Visualization ready!';
     statusBarItem.show();
@@ -148,14 +150,12 @@ async function visualizeInPanel(context: vscode.ExtensionContext) {
   }
 
   const repoPath = workspaceFolder.uri.fsPath;
-
-  // Check if we need to modify Python CLI to output JSON
-  // For now, we'll use a workaround: generate HTML and extract data
-  // Or start server and fetch HTML
+  const config = vscode.workspace.getConfiguration('codebaseVisualizer');
+  const visualizerRepoPath = config.get<string>('visualizerRepoPath', '')?.trim() || undefined;
 
   try {
     // Check environment
-    const envCheck = await pythonBridge.checkEnvironment();
+    const envCheck = await pythonBridge.checkEnvironment(visualizerRepoPath);
     if (!envCheck.available) {
       vscode.window.showErrorMessage(
         `Python environment check failed: ${envCheck.error}`
@@ -179,7 +179,7 @@ async function visualizeInPanel(context: vscode.ExtensionContext) {
       async (progress) => {
         progress.report({ increment: 0, message: 'Analyzing codebase...' });
 
-        await pythonBridge!.generateHTML(repoPath, htmlPath);
+        await pythonBridge!.generateHTML(repoPath, htmlPath, undefined, visualizerRepoPath);
 
         progress.report({ increment: 50, message: 'Creating visualization...' });
 
