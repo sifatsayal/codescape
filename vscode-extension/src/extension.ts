@@ -7,14 +7,20 @@ import { WebviewPanel } from './webviewPanel';
 let pythonBridge: PythonBridge | null = null;
 let webviewPanel: WebviewPanel | null = null;
 
+function getPythonPath(): string {
+  const raw = vscode.workspace.getConfiguration('codebaseVisualizer').get<string>('pythonPath');
+  return raw && raw.trim() ? raw.trim() : 'python3';
+}
+
+function getPythonBridge(): PythonBridge {
+  if (!pythonBridge) {
+    pythonBridge = new PythonBridge(getPythonPath());
+  }
+  return pythonBridge;
+}
+
 export function activate(context: vscode.ExtensionContext) {
   console.log('Codebase Visualizer extension is now active');
-
-  // Get Python path from configuration (config read again in commands for latest value)
-  const config = vscode.workspace.getConfiguration('codebaseVisualizer');
-  const pythonPath = config.get<string>('pythonPath', 'python3');
-
-  pythonBridge = new PythonBridge(pythonPath);
 
   // Register command: Visualize Codebase (External Browser)
   const visualizeCommand = vscode.commands.registerCommand(
@@ -26,7 +32,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register command: Visualize Codebase (Embedded Panel)
   const visualizePanelCommand = vscode.commands.registerCommand(
-    'codebaseVisualizer.visualizeInPanel',
+    'codebaseVisualizer.visualizeEmbedded',
     async () => {
       await visualizeInPanel(context);
     }
@@ -47,7 +53,8 @@ export function deactivate() {
  * Spawns Python server and opens browser
  */
 async function visualizeInBrowser(context: vscode.ExtensionContext) {
-  if (!pythonBridge) {
+  const bridge = getPythonBridge();
+  if (!bridge) {
     vscode.window.showErrorMessage('Python bridge not initialized');
     return;
   }
@@ -74,7 +81,7 @@ async function visualizeInBrowser(context: vscode.ExtensionContext) {
   statusBarItem.show();
 
   try {
-    const envCheck = await pythonBridge.checkEnvironment(visualizerRepoPath);
+    const envCheck = await bridge.checkEnvironment(visualizerRepoPath);
     if (!envCheck.available) {
       statusBarItem.dispose();
       vscode.window.showErrorMessage(
@@ -87,7 +94,7 @@ async function visualizeInBrowser(context: vscode.ExtensionContext) {
     statusBarItem.show();
 
     // Start Python server (visualizes repoPath = current workspace folder)
-    const { port, process } = await pythonBridge.startServer(repoPath, undefined, undefined, visualizerRepoPath);
+    const { port, process } = await bridge.startServer(repoPath, undefined, undefined, visualizerRepoPath);
 
     statusBarItem.text = '$(check) Visualization ready!';
     statusBarItem.show();
@@ -136,7 +143,8 @@ async function visualizeInBrowser(context: vscode.ExtensionContext) {
  * Creates webview panel with embedded visualization
  */
 async function visualizeInPanel(context: vscode.ExtensionContext) {
-  if (!pythonBridge) {
+  const bridge = getPythonBridge();
+  if (!bridge) {
     vscode.window.showErrorMessage('Python bridge not initialized');
     return;
   }
@@ -155,7 +163,7 @@ async function visualizeInPanel(context: vscode.ExtensionContext) {
 
   try {
     // Check environment
-    const envCheck = await pythonBridge.checkEnvironment(visualizerRepoPath);
+    const envCheck = await bridge.checkEnvironment(visualizerRepoPath);
     if (!envCheck.available) {
       vscode.window.showErrorMessage(
         `Python environment check failed: ${envCheck.error}`
@@ -179,7 +187,7 @@ async function visualizeInPanel(context: vscode.ExtensionContext) {
       async (progress) => {
         progress.report({ increment: 0, message: 'Analyzing codebase...' });
 
-        await pythonBridge!.generateHTML(repoPath, htmlPath, undefined, visualizerRepoPath);
+        await bridge.generateHTML(repoPath, htmlPath, undefined, visualizerRepoPath);
 
         progress.report({ increment: 50, message: 'Creating visualization...' });
 

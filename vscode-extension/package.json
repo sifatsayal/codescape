@@ -11,7 +11,8 @@
     "Other"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onCommand:codebaseVisualizer.visualize",
+    "onCommand:codebaseVisualizer.visualizeEmbedded"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -22,7 +23,7 @@
         "category": "Codebase Visualizer"
       },
       {
-        "command": "codebaseVisualizer.visualizeInPanel",
+        "command": "codebaseVisualizer.visualizeEmbedded",
         "title": "Visualize Codebase (Embedded)",
         "category": "Codebase Visualizer"
       }
@@ -33,7 +34,7 @@
         "codebaseVisualizer.pythonPath": {
           "type": "string",
           "default": "python3",
-          "description": "Path to Python executable (python3, python, or full path)"
+          "description": "Path to python executable used to run the codebase visualizer."
         },
         "codebaseVisualizer.autoOpen": {
           "type": "boolean",
