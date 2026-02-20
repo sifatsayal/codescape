@@ -4,6 +4,17 @@ Use this guide to decide **what kind of change** you’re making and **where to 
 
 ---
 
+## Current development focus: browser popup
+
+**For now, we are developing on the browser popup (external browser) channel**, not the embedded webview. When making extension or integration changes, focus on the flow that:
+
+- Runs **Codebase Visualizer: Visualize Codebase** (opens visualization in your default browser)
+- Uses `visualizeInBrowser()` in `extension.ts` and `startServer()` in `pythonBridge.ts`
+
+The embedded panel (Visualize Codebase (Embedded) / `webviewPanel.ts` / `generateHTML()`) is out of scope for current development. Keep this in mind when adding features or fixing bugs.
+
+---
+
 ## The two types of changes
 
 ### 1. **Visualizer UI changes**
@@ -33,25 +44,27 @@ No need to reload the Cursor extension for Visualizer UI–only changes.
 
 ### 2. **Extension changes**
 
-**What it is:** Anything that changes how the **VS Code / Cursor integration** works—commands, settings, how the extension talks to Python, how the webview panel is created and managed, or **registering actions that run from the IDE** (e.g. when the user saves a file or selects something in the sidebar).
+**What it is:** Anything that changes how the **VS Code / Cursor integration** works—commands, settings, how the extension talks to Python, or **registering actions that run from the IDE** (e.g. when the user saves a file or selects something in the sidebar).
+
+**Current focus:** Extension work is centered on the **browser popup** flow (command **Visualize Codebase** → `visualizeInBrowser()` → `pythonBridge.startServer()`). The embedded webview flow is not in scope for now.
 
 **Examples:**  
 - Adding or changing a command or setting  
 - **Registering IDE-triggered actions** (e.g. on save, on file or folder selection in the sidebar)  
-- Changing how the extension finds or invokes Python (`pythonPath`, etc.)  
-- Changing webview panel behavior (e.g. how content is loaded or how messages are passed)  
-- Fixing a bug in the extension host side (TypeScript/Node)
+- Changing how the extension finds or invokes Python (`pythonPath`, `visualizerRepoPath`, etc.)  
+- Fixing a bug in the extension host side (TypeScript/Node) for the browser flow  
 
 **Where to work:**  
 - **Repo location:** `vscode-extension/` (the VS Code/Cursor extension).  
-- **Main files:** `vscode-extension/src/extension.ts`, `vscode-extension/src/pythonBridge.ts`, `vscode-extension/src/webviewPanel.ts`.  
-- Also: `vscode-extension/package.json` (commands, settings, activation).
+- **Main files for browser flow:** `vscode-extension/src/extension.ts` (especially `visualizeInBrowser()`), `vscode-extension/src/pythonBridge.ts` (`checkEnvironment()`, `startServer()`).  
+- Also: `vscode-extension/package.json` (commands, settings, activation).  
+- *Embedded flow (out of scope for now):* `webviewPanel.ts`, `generateHTML()` in `pythonBridge.ts`.
 
 **Fast feedback loop:**  
 1. Open the **`vscode-extension`** folder in Cursor (or have it as the active workspace).  
 2. In a terminal: `cd vscode-extension && npm run watch` (leave it running).  
 3. Press **F5** (or **Run → Start Debugging**) to launch the **Extension Development Host** window.  
-4. In that second window, run **Codebase Visualizer: Visualize Codebase** (or the embedded command) to test.  
+4. In that second window, run **Codebase Visualizer: Visualize Codebase** (browser popup) to test.  
 5. After changing extension code (TS/JS): in the **Extension Development Host** window, run **Developer: Reload Window** (`Cmd+Shift+P` / `Ctrl+Shift+P`).  
 No need to repackage or reinstall the `.vsix` for day-to-day extension development.
 
@@ -71,6 +84,7 @@ No need to repackage or reinstall the `.vsix` for day-to-day extension developme
 ## Summary
 
 - **Visualizer UI** → Edit under `visualizer/`, run Python from repo root, restart process + refresh browser.  
-- **Extension** → Edit under `vscode-extension/`, use `npm run watch` + F5, then **Developer: Reload Window** in the Extension Development Host to see changes.
+- **Extension** → Edit under `vscode-extension/`, use `npm run watch` + F5, then **Developer: Reload Window** in the Extension Development Host to see changes.  
+- **Channel focus** → Develop and test using the **browser popup** (Visualize Codebase), not the embedded panel.
 
 Using the right workflow for the type of change keeps your feedback loop fast in Cursor.
