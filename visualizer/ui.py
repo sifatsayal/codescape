@@ -392,6 +392,7 @@ def generate_html(data: dict) -> str:
             display: flex;
             align-items: center;
             gap: 6px;
+            flex-wrap: wrap;
         }
         
         .deps-title .count {
@@ -400,6 +401,45 @@ def generate_html(data: dict) -> str:
         }
         .deps-section.outbound .deps-title .count {
             color: #f59e0b;
+        }
+        
+        .deps-title-info {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            padding: 0;
+            border: none;
+            border-radius: 50%;
+            background: rgba(100, 100, 150, 0.3);
+            color: #888;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+        .deps-title-info:hover {
+            background: rgba(124, 58, 237, 0.3);
+            color: #a78bfa;
+        }
+        .deps-tooltip {
+            display: none;
+            width: 100%;
+            margin-top: 6px;
+            padding: 10px 12px;
+            font-size: 11px;
+            line-height: 1.4;
+            color: #aaa;
+            background: rgba(20, 20, 35, 0.95);
+            border: 1px solid rgba(100, 100, 150, 0.25);
+            border-radius: 8px;
+        }
+        .deps-tooltip.show {
+            display: block;
+        }
+        .deps-tooltip .filename {
+            color: #06b6d4;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500;
         }
         
         .dep-item {
@@ -918,7 +958,7 @@ def generate_html(data: dict) -> str:
       </div>
       <div class="legend-label">
         <div class="legend-name">Inbound</div>
-        <div class="legend-caption">Files that import this file</div>
+        <div class="legend-caption">Inbound: files that import this file</div>
       </div>
 
       <div class="legend-icon">
@@ -928,7 +968,7 @@ def generate_html(data: dict) -> str:
       </div>
       <div class="legend-label">
         <div class="legend-name">Outbound</div>
-        <div class="legend-caption">Files this file imports</div>
+        <div class="legend-caption">Outbound: files this file imports</div>
       </div>
     </div>
   </div>
@@ -1396,7 +1436,7 @@ def generate_html(data: dict) -> str:
                     <div class="file-info">
                         <div class="file-name"><svg class="sidebar-icon" viewBox="0 0 24 24"><use href="#file-icon"/></svg><span>${esc(node.name)}</span></div>
                         <div class="file-path">${esc(node.path)}</div>
-                        <div class="file-meta four-col">
+                        <div class="file-meta">
                             <div class="meta-item">
                                 <div class="meta-label">Language</div>
                                 <div class="meta-value file">${esc(node.language || '')}</div>
@@ -1405,19 +1445,13 @@ def generate_html(data: dict) -> str:
                                 <div class="meta-label">Lines</div>
                                 <div class="meta-value file">${node.loc != null ? node.loc.toLocaleString() : 0}</div>
                             </div>
-                            <div class="meta-item highlight-inbound">
-                                <div class="meta-label">Fan-In</div>
-                                <div class="meta-value">${node.fanIn ?? 0}</div>
-                            </div>
-                            <div class="meta-item highlight-outbound">
-                                <div class="meta-label">Fan-Out</div>
-                                <div class="meta-value">${node.fanOut ?? 0}</div>
-                            </div>
                         </div>
                         ${dependents.length > 0 ? `
                             <div class="deps-section">
                                 <div class="deps-title">
-                                    Files that import this (<span class="count">${dependents.length}</span>)
+                                    Inbound (<span class="count">${dependents.length}</span>)
+                                    <button type="button" class="deps-title-info" aria-label="What does Inbound mean?" onclick="this.nextElementSibling.classList.toggle('show')"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></button>
+                                    <div class="deps-tooltip">The listed files import <span class="filename">${esc(node.name)}</span>. When you make a change to <span class="filename">${esc(node.name)}</span>, the listed files may be affected.</div>
                                 </div>
                                 ${renderInternalDepSection(dependents, currentFolderPath, 'inbound')}
                             </div>
@@ -1425,7 +1459,9 @@ def generate_html(data: dict) -> str:
                         ${dependencies.length > 0 ? `
                             <div class="deps-section outbound">
                                 <div class="deps-title">
-                                    Files this imports (<span class="count">${dependencies.length}</span>)
+                                    Outbound (<span class="count">${dependencies.length}</span>)
+                                    <button type="button" class="deps-title-info" aria-label="What does Outbound mean?" onclick="this.nextElementSibling.classList.toggle('show')"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></button>
+                                    <div class="deps-tooltip"><span class="filename">${esc(node.name)}</span> imports the listed files. When you make a change to any of the listed files, <span class="filename">${esc(node.name)}</span> may be affected.</div>
                                 </div>
                                 ${renderInternalDepSection(dependencies, currentFolderPath, 'outbound')}
                             </div>
