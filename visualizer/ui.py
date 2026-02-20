@@ -195,6 +195,40 @@ def generate_html(data: dict) -> str:
             overflow-y: auto;
             padding: 16px;
         }
+        .sidebar-nav {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(100, 100, 150, 0.2);
+        }
+        .sidebar-nav-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 28px;
+            padding: 0;
+            border: none;
+            border-radius: 6px;
+            background: rgba(100, 100, 150, 0.2);
+            color: #888;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+        .sidebar-nav-btn:hover:not(:disabled) {
+            background: rgba(124, 58, 237, 0.3);
+            color: #e0e0e0;
+        }
+        .sidebar-nav-btn:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+        .sidebar-nav-btn svg {
+            width: 16px;
+            height: 16px;
+        }
         .sidebar-section {
             margin-bottom: 20px;
         }
@@ -453,6 +487,7 @@ def generate_html(data: dict) -> str:
             cursor: pointer;
             transition: all 0.2s;
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
             gap: 8px;
         }
@@ -490,23 +525,71 @@ def generate_html(data: dict) -> str:
             color: #f59e0b;
         }
         
-        .dep-item-location-chip {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            color: #666;
-            padding: 2px 6px;
-            border-radius: 4px;
-            background: rgba(0,0,0,0.2);
-            max-width: 140px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+        .dep-item-location-wrap {
+            display: flex;
+            align-items: center;
+            margin-left: auto;
+            flex-shrink: 0;
         }
         
-        .dep-item.dep-item-outside .dep-item-location-chip {
-            margin-left: auto;
-            background: rgba(124, 58, 237, 0.35);
-            color: #c4b5fd;
+        .dep-item-path-toggle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            padding: 0;
+            border: none;
+            border-radius: 4px;
+            background: rgba(100, 100, 150, 0.25);
+            color: #a78bfa;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+        .dep-item-path-toggle:hover {
+            background: rgba(124, 58, 237, 0.4);
+            color: #e0e0e0;
+        }
+        .dep-item-path-toggle svg {
+            width: 12px;
+            height: 12px;
+        }
+        .dep-item-path-toggle-chevron {
+            display: inline-block;
+            font-size: 8px;
+            margin-left: 1px;
+            opacity: 0.9;
+        }
+        .dep-item.show-full-path .dep-item-path-toggle-chevron {
+            transform: rotate(180deg);
+        }
+        .dep-item-full-path {
+            display: none;
+            flex-basis: 100%;
+            width: 100%;
+            margin-top: 6px;
+            margin-left: 0;
+            order: 10;
+            padding: 6px 8px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            word-break: break-all;
+            line-height: 1.35;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 4px;
+            border-left: 2px solid rgba(124, 58, 237, 0.6);
+        }
+        .dep-item.show-full-path .dep-item-full-path {
+            display: block;
+        }
+        .dep-item-full-path .dep-item-path-folder {
+            color: #7c3aed;
+        }
+        .dep-item-full-path .dep-item-path-file {
+            color: #06b6d4;
+        }
+        .dep-item-full-path .dep-item-path-sep {
+            color: #444;
         }
         
         .imports-list {
@@ -881,6 +964,10 @@ def generate_html(data: dict) -> str:
     </div>
     
     <div id="sidebar">
+        <div id="sidebar-nav" class="sidebar-nav">
+            <button type="button" id="sidebar-back-btn" class="sidebar-nav-btn" title="Back" aria-label="Back" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+            <button type="button" id="sidebar-forward-btn" class="sidebar-nav-btn" title="Forward" aria-label="Forward" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+        </div>
         <div id="details-panel">
             <div class="details-placeholder">Click a node to view its details</div>
         </div>
@@ -1000,6 +1087,8 @@ def generate_html(data: dict) -> str:
         let selectedNode = null;
         let simulation = null;
         let folderCountMode = 'direct';  // 'direct' | 'recursive'
+        let selectionHistory = [];
+        let historyIndex = -1;
 
         const FILE_CYAN = '#06b6d4';
         let maxMetrics = graphData.maxMetrics;
@@ -1011,10 +1100,13 @@ def generate_html(data: dict) -> str:
             rebuildLinksMap();
             currentPath = '';
             selectedNode = null;
+            selectionHistory = [];
+            historyIndex = -1;
             updateBreadcrumb();
             renderGraph();
             updateSelection();
             renderSidePanel();
+            updateSidebarNav();
         }
 
         async function loadRepo() {
@@ -1119,14 +1211,67 @@ def generate_html(data: dict) -> str:
         
         function navigateTo(path, clearPanel) {
             if (clearPanel) selectedNode = null;
+            pushHistory(path || '');
             currentPath = path;
             updateBreadcrumb();
             renderGraph();
             updateSelection();
             renderSidePanel();
+            updateSidebarNav();
         }
         
+        function pushHistory(path) {
+            if (path === (selectionHistory[historyIndex] ?? null)) return;
+            selectionHistory = selectionHistory.slice(0, historyIndex + 1);
+            selectionHistory.push(path);
+            historyIndex = selectionHistory.length - 1;
+        }
+        function applyHistoryEntry(path) {
+            if (path === '') {
+                currentPath = '';
+                selectedNode = null;
+                updateBreadcrumb();
+                renderGraph();
+                updateSelection();
+                renderSidePanel();
+                updateSidebarNav();
+                return;
+            }
+            const node = nodesById.get(path);
+            if (!node) return;
+            if (node.type === 'folder') {
+                selectedNode = null;
+                currentPath = path;
+            } else {
+                selectedNode = node;
+                const parts = path.split('/');
+                parts.pop();
+                currentPath = parts.join('/');
+            }
+            updateBreadcrumb();
+            renderGraph();
+            updateSelection();
+            renderSidePanel();
+            updateSidebarNav();
+        }
+        function goBack() {
+            if (historyIndex <= 0) return;
+            historyIndex--;
+            applyHistoryEntry(selectionHistory[historyIndex]);
+        }
+        function goForward() {
+            if (selectionHistory.length === 0 || historyIndex >= selectionHistory.length - 1) return;
+            historyIndex++;
+            applyHistoryEntry(selectionHistory[historyIndex]);
+        }
+        function updateSidebarNav() {
+            const backBtn = document.getElementById('sidebar-back-btn');
+            const forwardBtn = document.getElementById('sidebar-forward-btn');
+            if (backBtn) backBtn.disabled = historyIndex <= 0 || selectionHistory.length === 0;
+            if (forwardBtn) forwardBtn.disabled = historyIndex >= selectionHistory.length - 1 || selectionHistory.length === 0;
+        }
         function focusFile(path) {
+            pushHistory(path);
             const parts = path.split('/');
             parts.pop();
             const parentPath = parts.join('/');
@@ -1136,12 +1281,14 @@ def generate_html(data: dict) -> str:
             renderGraph();
             updateSelection();
             renderSidePanel();
+            updateSidebarNav();
         }
         function clearSelection() {
             selectedNode = null;
             updateBreadcrumb();
             updateSelection();
             renderSidePanel();
+            updateSidebarNav();
         }
         
         function updateBreadcrumb() {
@@ -1224,9 +1371,14 @@ def generate_html(data: dict) -> str:
                     if (d.type === 'folder') {
                         navigateTo(d.path || d.id);
                     } else {
+                        pushHistory(d.id || d.path);
+                        const parts = (d.path || d.id).split('/');
+                        parts.pop();
+                        currentPath = parts.join('/');
                         updateBreadcrumb();
                         updateSelection();
                         renderSidePanel();
+                        updateSidebarNav();
                     }
                 });
             
@@ -1371,15 +1523,28 @@ def generate_html(data: dict) -> str:
                 const name = p.split('/').pop();
                 if (inFolder) {
                     return `<div class="dep-item ${cls}" onclick="focusFile('${escJs(p)}')">
-                        <span class="dep-item-icon" aria-hidden="true">•</span>
+                        <span class="dep-item-icon" aria-hidden="true">${arrow}</span>
                         <span class="name" title="${escapeAttr(p)}">${escapeAttr(name)}</span>
                     </div>`;
                 }
-                const locChip = compactLocationChip(p, currentFolderPath);
+                const fullPathFromRoot = (graphData.rootName ? graphData.rootName + '/' : '') + (p.startsWith('/') ? p.slice(1) : p);
+                const parts = fullPathFromRoot.split('/').filter(Boolean);
+                const pathSegmentsHtml = parts.length === 0 ? '<span class="dep-item-path-file">(root)</span>' : parts.map((seg, i) => {
+                    const isLast = i === parts.length - 1;
+                    const spanClass = isLast ? 'dep-item-path-file' : 'dep-item-path-folder';
+                    const sep = i === 0 ? '' : '<span class="dep-item-path-sep">/</span>';
+                    return sep + `<span class="${spanClass}">${escapeAttr(seg)}</span>`;
+                }).join('');
                 return `<div class="dep-item ${cls} dep-item-outside" onclick="focusFile('${escJs(p)}')">
                     <span class="dep-item-icon" aria-hidden="true">${arrow}</span>
                     <span class="name dep-item-name-clickable" title="${escapeAttr(p)}">${escapeAttr(name)}</span>
-                    <span class="dep-item-location-chip" title="${escapeAttr(p)}">${escapeAttr(locChip)}</span>
+                    <div class="dep-item-location-wrap" onclick="event.stopPropagation()">
+                        <button type="button" class="dep-item-path-toggle" title="Expand to show full path" aria-label="Show full path" onclick="this.closest('.dep-item').classList.toggle('show-full-path')">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                            <span class="dep-item-path-toggle-chevron">&#9660;</span>
+                        </button>
+                    </div>
+                    <div class="dep-item-full-path">${pathSegmentsHtml}</div>
                 </div>`;
             }).join('');
             if (allItems.length > 20) html += `<div class="empty-state">+${allItems.length - 20} more</div>`;
@@ -1508,8 +1673,14 @@ def generate_html(data: dict) -> str:
             `;
         }
         
+        const sidebarBackBtn = document.getElementById('sidebar-back-btn');
+        const sidebarForwardBtn = document.getElementById('sidebar-forward-btn');
+        if (sidebarBackBtn) sidebarBackBtn.addEventListener('click', goBack);
+        if (sidebarForwardBtn) sidebarForwardBtn.addEventListener('click', goForward);
+
         // Initial render
         renderGraph();
+        updateSidebarNav();
     </script>
 </body>
 </html>'''
