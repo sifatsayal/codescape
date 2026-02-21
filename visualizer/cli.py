@@ -196,11 +196,14 @@ Examples:
         if port != 8000:
             print(f"   Port 8000 in use, using port {port} instead.")
     
-    # Start server with load-repo API so the UI can load another repo
+    # Start server with load-repo API and initial repo path for rescan
     server_thread = threading.Thread(
         target=start_server,
         args=(html, port),
-        kwargs={"load_repo_callback": build_graph_data_for_path},
+        kwargs={
+            "load_repo_callback": build_graph_data_for_path,
+            "initial_repo_path": str(repo_path),
+        },
         daemon=True,
     )
     server_thread.start()

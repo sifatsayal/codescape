@@ -260,6 +260,35 @@ def generate_html(data: dict) -> str:
             background: rgba(239, 68, 68, 0.3);
             color: #fca5a5;
         }
+        .recent-changes-panel {
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(100, 100, 150, 0.2);
+        }
+        .recent-changes-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        .recent-changes-muted, .recent-changes-list {
+            color: #6b7280;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1.5;
+        }
+        .recent-changes-muted {
+            margin-bottom: 10px;
+        }
+        .recent-changes-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .recent-changes-list .change-line {
+            margin-bottom: 4px;
+            word-break: break-all;
+        }
         .details-placeholder {
             color: #444;
             font-style: italic;
@@ -971,6 +1000,11 @@ def generate_html(data: dict) -> str:
         <div id="details-panel">
             <div class="details-placeholder">Click a node to view its details</div>
         </div>
+        <div id="recent-changes-panel" class="recent-changes-panel">
+            <div class="recent-changes-title">Recent changes (taralyn's step)</div>
+            <div id="recent-changes-last-send" class="recent-changes-muted">Last Cmd+S: —</div>
+            <div id="recent-changes-list" class="recent-changes-list"></div>
+        </div>
     </div>
     
     <div id="legend">
@@ -1681,6 +1715,70 @@ def generate_html(data: dict) -> str:
         // Initial render
         renderGraph();
         updateSidebarNav();
+
+        // Recent changes (taralyn's step) — raw list from extension, shown in grey
+        function formatChangeLine(c) {
+            const k = c.kind ? ' (' + c.kind + ')' : '';
+            if (c.path !== undefined) return c.type + ': ' + c.path + k;
+            if (c.fromFile !== undefined) return c.type + ': ' + c.fromFile + ' → ' + c.toFile;
+            if (c.oldPath !== undefined) return c.type + ': ' + c.oldPath + ' → ' + c.newPath + k;
+            return c.type;
+        }
+        var lastSeenSendTimestamp = null;
+        function loadRecentChanges() {
+            const lastEl = document.getElementById('recent-changes-last-send');
+            const listEl = document.getElementById('recent-changes-list');
+            if (!lastEl || !listEl) return;
+            fetch(window.location.origin + '/api/last_changes')
+                .then(function(r) { return r.ok ? r.json() : null; })
+                .then(function(data) {
+                    if (!data) return;
+                    const ts = data.lastSendTimestamp;
+                    lastEl.textContent = 'Last Cmd+S: ' + (ts == null ? 'Never' : new Date(ts).toISOString());
+                    const changes = data.changes || [];
+                    listEl.innerHTML = changes.length === 0
+                        ? ''
+                        : changes.map(function(c) {
+                            return '<div class="change-line">' + formatChangeLine(c).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+                        }).join('');
+                    // When extension sent a new bundle (timestamp changed), refetch graph (same full scan as initial open: files, folders, imports)
+                    if (ts !== lastSeenSendTimestamp) {
+                        lastSeenSendTimestamp = ts;
+                        fetch(window.location.origin + '/api/rescan')
+                            .then(function(r) {
+                                if (r.ok) return r.json();
+                                if (r.status === 400) return null;
+                                return Promise.reject();
+                            })
+                            .then(function(data) {
+                                if (data && data.nodes && data.links) {
+                                    updateGraphData(data);
+                                    return;
+                                }
+                                var pathInput = document.getElementById('load-repo-path');
+                                if (!pathInput) return;
+                                var pathToLoad = pathInput.value.trim();
+                                if (pathToLoad) {
+                                    loadRepo();
+                                } else {
+                                    fetch(window.location.origin + '/api/initial_path')
+                                        .then(function(r2) { return r2.ok ? r2.json() : null; })
+                                        .then(function(ip) {
+                                            if (ip && ip.path && pathInput) {
+                                                pathInput.value = ip.path;
+                                                loadRepo();
+                                            }
+                                        })
+                                        .catch(function() {});
+                                }
+                            })
+                            .catch(function() {});
+                    }
+                })
+                .catch(function() {});
+        }
+        loadRecentChanges();
+        setInterval(loadRecentChanges, 3000);
     </script>
 </body>
 </html>'''

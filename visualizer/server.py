@@ -69,9 +69,14 @@ if ($dialog.SelectedPath) { $dialog.SelectedPath }
         return None
 
 
-def create_handler(html_content, load_repo_callback=None):
+def create_handler(html_content, load_repo_callback=None, initial_repo_path=None):
     """Create a custom HTTP handler class with the HTML content.
-    If load_repo_callback is set, GET /api/load?path=... will call it and return JSON."""
+    If load_repo_callback is set, GET /api/load?path=... will call it and return JSON.
+    If initial_repo_path is set, POST /api/rescan rescans that repo and returns new graph JSON (body optional: {"changes": [...]})."""
+    # Store last received changes and timestamp for visualizer side panel
+    last_changes = []
+    last_send_timestamp = None  # from extension "Last Cmd+S"
+
     class VisualizationHandler(http.server.SimpleHTTPRequestHandler):
         """Custom HTTP handler to serve the visualization HTML."""
 
@@ -83,6 +88,29 @@ def create_handler(html_content, load_repo_callback=None):
                     self._send_json(200, {'path': path})
                 else:
                     self._send_json(200, {'path': '', 'cancelled': True})
+                return
+            if parsed.path == '/api/last_changes':
+                self._send_json(200, {
+                    'lastSendTimestamp': last_send_timestamp,
+                    'changes': list(last_changes),
+                })
+                return
+            if parsed.path == '/api/initial_path':
+                self._send_json(200, {'path': initial_repo_path} if initial_repo_path else {'path': None})
+                return
+            if parsed.path == '/api/rescan':
+                # Same as initial load: full scan (files, folders, imports) for the repo we started with
+                if not initial_repo_path or load_repo_callback is None:
+                    self._send_json(400, {'error': 'Rescan not available (no initial repo path)'})
+                    return
+                try:
+                    graph_data = load_repo_callback(initial_repo_path)
+                    if isinstance(graph_data, dict) and 'error' in graph_data:
+                        self._send_json(400, graph_data)
+                    else:
+                        self._send_json(200, graph_data)
+                except Exception as e:
+                    self._send_json(500, {'error': str(e)})
                 return
             if parsed.path == '/api/load' and load_repo_callback is not None:
                 query = parse_qs(parsed.query)
@@ -110,6 +138,41 @@ def create_handler(html_content, load_repo_callback=None):
             else:
                 self.send_response(404)
                 self.end_headers()
+
+        def do_POST(self):
+            nonlocal last_send_timestamp
+            parsed = urlparse(self.path)
+            if parsed.path == '/api/rescan':
+                if not initial_repo_path or load_repo_callback is None:
+                    self._send_json(400, {'error': 'Rescan not available (no initial repo path)'})
+                    return
+                # Optional body: {"changes": [...], "lastSendTimestamp": number}
+                changes = []
+                content_length = int(self.headers.get('Content-Length', 0) or 0)
+                if content_length > 0:
+                    try:
+                        body = self.rfile.read(content_length).decode('utf-8')
+                        data = json.loads(body) if body.strip() else {}
+                        changes = data.get('changes', [])
+                        ts = data.get('lastSendTimestamp')
+                        if ts is not None:
+                            last_send_timestamp = ts
+                    except (json.JSONDecodeError, ValueError):
+                        self._send_json(400, {'error': 'Invalid JSON body'})
+                        return
+                last_changes.clear()
+                last_changes.extend(changes)
+                try:
+                    graph_data = load_repo_callback(initial_repo_path)
+                    if isinstance(graph_data, dict) and 'error' in graph_data:
+                        self._send_json(400, graph_data)
+                    else:
+                        self._send_json(200, graph_data)
+                except Exception as e:
+                    self._send_json(500, {'error': str(e)})
+                return
+            self.send_response(404)
+            self.end_headers()
 
         def _send_json(self, status, data):
             body = json.dumps(data).encode('utf-8')
@@ -152,10 +215,15 @@ def find_available_port(start=8000, max_tries=20):
     return None
 
 
-def start_server(html_content, port=8000, load_repo_callback=None):
+def start_server(html_content, port=8000, load_repo_callback=None, initial_repo_path=None):
     """Start a local web server to serve the visualization.
-    If load_repo_callback(path_str) is provided, GET /api/load?path=... returns graph JSON for that repo."""
-    handler_class = create_handler(html_content, load_repo_callback=load_repo_callback)
+    If load_repo_callback(path_str) is provided, GET /api/load?path=... returns graph JSON for that repo.
+    If initial_repo_path is set, POST /api/rescan rescans that repo and returns new graph JSON."""
+    handler_class = create_handler(
+        html_content,
+        load_repo_callback=load_repo_callback,
+        initial_repo_path=str(initial_repo_path) if initial_repo_path else None,
+    )
     # Allow reusing the port so restarts don't leave it in TIME_WAIT
     socketserver.TCPServer.allow_reuse_address = True
 

@@ -1,6 +1,8 @@
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as nodeProcess from 'process';
+
 
 export interface GraphData {
   nodes: any[];
@@ -190,6 +192,7 @@ export class PythonBridge {
       const process = spawn(this.pythonPath, args, {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...nodeProcess.env, PYTHONUNBUFFERED: '1' },
       });
 
       let stdout = '';
@@ -213,12 +216,13 @@ export class PythonBridge {
         reject(error);
       });
 
-      // Timeout after 10 seconds
-      setTimeout(() => {
+      // Timeout after 2 minutes (Python does full scan + graph + HTML before printing "Local URL:")
+      const timeoutMs = 120000;
+      const timeoutId = setTimeout(() => {
         if (!stdout.includes('Local URL:')) {
-          reject(new Error('Server startup timeout'));
+          reject(new Error('Server startup timeout (visualizer may still open in browser for large repos)'));
         }
-      }, 10000);
+      }, timeoutMs);
     });
   }
 
