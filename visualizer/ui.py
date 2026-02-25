@@ -22,7 +22,7 @@ def generate_html(data: dict) -> str:
         
         body {
             font-family: 'Space Grotesk', sans-serif;
-            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #0f0f1a 100%);
+            background: #0d0d12;
             color: #e0e0e0;
             overflow: hidden;
             height: 100vh;
@@ -121,7 +121,7 @@ def generate_html(data: dict) -> str:
         }
         
         .breadcrumb-sep {
-            color: #444;
+            color: #6b7280;
         }
         .breadcrumb-file {
             color: #06b6d4;
@@ -236,7 +236,7 @@ def generate_html(data: dict) -> str:
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 1px;
-            color: #666;
+            color: #9ca3af;
             margin-bottom: 10px;
             display: flex;
             align-items: center;
@@ -269,11 +269,11 @@ def generate_html(data: dict) -> str:
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 1px;
-            color: #666;
+            color: #9ca3af;
             margin-bottom: 8px;
         }
         .recent-changes-muted, .recent-changes-list {
-            color: #6b7280;
+            color: #9ca3af;
             font-size: 12px;
             font-family: 'JetBrains Mono', monospace;
             line-height: 1.5;
@@ -290,7 +290,7 @@ def generate_html(data: dict) -> str:
             word-break: break-all;
         }
         .details-placeholder {
-            color: #444;
+            color: #888;
             font-style: italic;
             padding: 24px 16px;
             text-align: center;
@@ -304,7 +304,7 @@ def generate_html(data: dict) -> str:
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            color: #666;
+            color: #9ca3af;
             margin-bottom: 14px;
         }
         .details-repo-stats .stat {
@@ -315,7 +315,7 @@ def generate_html(data: dict) -> str:
             padding: 10px 0;
             border-bottom: 1px solid rgba(100, 100, 150, 0.15);
             font-size: 13px;
-            color: #888;
+            color: #d1d5db;
         }
         .details-repo-stats .stat:last-child { border-bottom: none; }
         .details-repo-stats .stat-value {
@@ -348,7 +348,7 @@ def generate_html(data: dict) -> str:
         
         .file-path {
             font-size: 12px;
-            color: #666;
+            color: #9ca3af;
             font-family: 'JetBrains Mono', monospace;
             margin-bottom: 16px;
             word-break: break-all;
@@ -694,22 +694,23 @@ def generate_html(data: dict) -> str:
         .node circle {
             stroke-width: 2px;
             transition: stroke-width 0.05s ease-out;
+            filter: url(#node-glow);
         }
         
         .node.selected circle {
             stroke-width: 4px;
-            filter: brightness(1.3) drop-shadow(0 0 8px currentColor);
+            filter: url(#node-glow) brightness(1.2) drop-shadow(0 0 10px currentColor);
             transition: stroke-width 0.05s ease-out;
         }
         
         .node:hover circle {
-            filter: brightness(1.3);
+            filter: url(#node-glow) brightness(1.15);
         }
         
         .node text {
             font-family: 'JetBrains Mono', monospace;
             font-size: 11px;
-            fill: #999;
+            fill: #e7e7ee;
             pointer-events: none;
         }
         
@@ -720,7 +721,8 @@ def generate_html(data: dict) -> str:
         }
         
         .link.visible {
-            stroke-opacity: 0.6;
+            stroke-opacity: 0.75;
+            filter: drop-shadow(0 0 2px currentColor);
         }
         
         .link.import {
@@ -752,9 +754,11 @@ def generate_html(data: dict) -> str:
         
         #legend {
             position: fixed;
-            bottom: 20px;
+            top: 70px;
             left: 20px;
-            width: 160px;
+            width: 180px;
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
             background: rgba(15, 15, 25, 0.95);
             padding: 12px 14px;
             border-radius: 14px;
@@ -765,6 +769,37 @@ def generate_html(data: dict) -> str:
         #legend.detailed-open {
             width: 260px;
             padding: 18px 12px 18px 18px;
+        }
+        .legend-types {
+            margin-bottom: 10px;
+        }
+        .legend-type-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            font-size: 12px;
+        }
+        .legend-swatch {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .legend-ext {
+            font-family: 'JetBrains Mono', monospace;
+            color: #e7e7ee;
+            font-weight: 500;
+        }
+        .legend-count {
+            color: #d1d5db;
+            margin-left: auto;
+            font-weight: 600;
+        }
+        .legend-deps-compact {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(100,100,150,0.2);
         }
         .legend-simple {
             display: block;
@@ -836,7 +871,7 @@ def generate_html(data: dict) -> str:
             font-size: 13px;
             letter-spacing: 0.08em;
             text-transform: uppercase;
-            color: #8b8b95;
+            color: #e7e7ee;
             margin: 0;
         }
         .legend-section { margin-bottom: 14px; }
@@ -850,7 +885,7 @@ def generate_html(data: dict) -> str:
             font-size: 11px;
             letter-spacing: 0.08em;
             text-transform: uppercase;
-            color: #666;
+            color: #9ca3af;
             margin-bottom: 10px;
         }
         .legend-grid {
@@ -872,7 +907,7 @@ def generate_html(data: dict) -> str:
         .legend-caption,
         .legend-caption-top {
             font-size: 11px;
-            color: #7b7b87;
+            color: #9ca3af;
             line-height: 1.3;
         }
         .legend-caption-top {
@@ -914,7 +949,7 @@ def generate_html(data: dict) -> str:
             border-radius: 12px;
             border: 1px solid rgba(100, 100, 150, 0.2);
             font-size: 11px;
-            color: #666;
+            color: #9ca3af;
         }
         
         .help-key {
@@ -927,14 +962,14 @@ def generate_html(data: dict) -> str:
         }
         
         .placeholder {
-            color: #444;
+            color: #888;
             font-style: italic;
             padding: 40px;
             text-align: center;
         }
         
         .empty-state {
-            color: #555;
+            color: #888;
             font-size: 12px;
             padding: 12px;
             text-align: center;
@@ -963,6 +998,13 @@ def generate_html(data: dict) -> str:
                     <stop offset="40%" style="stop-color:#c8d4e0;stop-opacity:1" />
                     <stop offset="100%" style="stop-color:#a0b0c4;stop-opacity:1" />
                 </linearGradient>
+                <filter id="node-glow" x="-80%" y="-80%" width="260%" height="260%">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+                    <feMerge>
+                        <feMergeNode in="blur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
                 <filter id="folder-glow" x="-50%" y="-50%" width="200%" height="200%">
                     <feGaussianBlur in="SourceAlpha" stdDeviation="1.5" result="blur"/>
                     <feOffset in="blur" dx="0" dy="0" result="offsetBlur"/>
@@ -1016,83 +1058,44 @@ def generate_html(data: dict) -> str:
       </button>
   </div>
   <div class="legend-simple">
-    <div class="legend-simple-grid">
-      <div class="legend-icon">
-        <svg class="legend-folder-node" viewBox="0 0 36 36">
-          <circle cx="18" cy="18" r="15"></circle>
-          <use href="#folder-icon" x="8" y="8" width="20" height="20"></use>
-        </svg>
+    <div id="legend-file-types" class="legend-types"></div>
+    <div class="legend-deps-compact">
+      <div class="legend-type-row">
+        <div class="legend-swatch" style="background:#22c55e;"></div>
+        <span class="legend-ext">Inbound</span>
       </div>
-      <div class="legend-name">Folder node</div>
-      <div class="legend-icon">
-        <div class="legend-circle" id="legend-file-circle"></div>
+      <div class="legend-type-row">
+        <div class="legend-swatch" style="background:#f59e0b;"></div>
+        <span class="legend-ext">Outbound</span>
       </div>
-      <div class="legend-name">File node</div>
-      <div class="legend-icon">
-        <svg class="legend-arrow" viewBox="0 0 52 16">
-          <line x1="0" y1="8" x2="44" y2="8" stroke="#22c55e" marker-end="url(#arrowhead-inbound)"></line>
-        </svg>
-      </div>
-      <div class="legend-name">Inbound</div>
-      <div class="legend-icon">
-        <svg class="legend-arrow" viewBox="0 0 52 16">
-          <line x1="0" y1="8" x2="44" y2="8" stroke="#f59e0b" marker-end="url(#arrowhead-outbound)"></line>
-        </svg>
-      </div>
-      <div class="legend-name">Outbound</div>
     </div>
   </div>
   <div class="legend-detailed legend-body">
-  <div class="legend-section">
-    <div class="legend-section-title">Nodes</div>
-    <div class="legend-caption-top">Node size: PageRank-derived importance.</div>
-    <div class="legend-grid">
-      <div class="legend-icon">
-        <svg class="legend-folder-node" viewBox="0 0 36 36">
-          <circle cx="18" cy="18" r="15"></circle>
-          <use href="#folder-icon" x="8" y="8" width="20" height="20"></use>
-        </svg>
-      </div>
-      <div class="legend-label">
-        <div class="legend-name">Folder node</div>
-        <div class="legend-caption">Click to open</div>
-      </div>
-
-      <div class="legend-icon">
-        <div class="legend-circle" id="legend-file-circle-detail"></div>
-      </div>
-      <div class="legend-label">
-        <div class="legend-name">File node</div>
-        <div class="legend-caption">Select to show deps</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="legend-section legend-divider">
-    <div class="legend-section-title">Dependencies</div>
-    <div class="legend-caption-top">A → B means A depends on B. Arrows show when a file is selected.</div>
-    <div class="legend-grid">
-      <div class="legend-icon">
-        <svg class="legend-arrow" viewBox="0 0 52 16">
-          <line x1="0" y1="8" x2="44" y2="8" stroke="#22c55e" marker-end="url(#arrowhead-inbound)"></line>
-        </svg>
-      </div>
-      <div class="legend-label">
-        <div class="legend-name">Inbound</div>
-        <div class="legend-caption">Inbound: files that import this file</div>
-      </div>
-
-      <div class="legend-icon">
-        <svg class="legend-arrow" viewBox="0 0 52 16">
-          <line x1="0" y1="8" x2="44" y2="8" stroke="#f59e0b" marker-end="url(#arrowhead-outbound)"></line>
-        </svg>
-      </div>
-      <div class="legend-label">
-        <div class="legend-name">Outbound</div>
-        <div class="legend-caption">Outbound: files this file imports</div>
+    <div id="legend-file-types-detail" class="legend-types"></div>
+    <div class="legend-section legend-divider">
+      <div class="legend-section-title">Dependencies</div>
+      <div class="legend-caption-top">A → B means A depends on B. Arrows show when a file is selected.</div>
+      <div class="legend-grid">
+        <div class="legend-icon">
+          <svg class="legend-arrow" viewBox="0 0 52 16">
+            <line x1="0" y1="8" x2="44" y2="8" stroke="#22c55e" marker-end="url(#arrowhead-inbound)"></line>
+          </svg>
+        </div>
+        <div class="legend-label">
+          <div class="legend-name">Inbound</div>
+          <div class="legend-caption">Files that import this file</div>
+        </div>
+        <div class="legend-icon">
+          <svg class="legend-arrow" viewBox="0 0 52 16">
+            <line x1="0" y1="8" x2="44" y2="8" stroke="#f59e0b" marker-end="url(#arrowhead-outbound)"></line>
+          </svg>
+        </div>
+        <div class="legend-label">
+          <div class="legend-name">Outbound</div>
+          <div class="legend-caption">Files this file imports</div>
+        </div>
       </div>
     </div>
-  </div>
   </div>
 </div>
 
@@ -1124,18 +1127,36 @@ def generate_html(data: dict) -> str:
         let selectionHistory = [];
         let historyIndex = -1;
 
-        const FILE_CYAN = '#06b6d4';
+        const FOLDER_COLOR = '#7c3aed';
+        const EXTENSION_PALETTE = [
+            '#ec4899', '#06b6d4', '#22c55e', '#f59e0b', '#ef4444', '#14b8a6',
+            '#8b5cf6', '#84cc16', '#f43f5e', '#0ea5e9', '#eab308', '#a855f7',
+            '#10b981', '#6366f1', '#78716c'
+        ];
+        const EXTENSION_FALLBACK = '#64748b';
+        let extensionColorMap = {};  // extension -> hex, computed from graphData.nodes
+
+        function computeExtensionColors(nodes) {
+            const exts = [...new Set(nodes.filter(n => n.type === 'file').map(n => n.extension || '').filter(Boolean))].sort();
+            const map = {};
+            exts.forEach((ext, i) => { map[ext] = EXTENSION_PALETTE[i % EXTENSION_PALETTE.length]; });
+            return map;
+        }
+
         let maxMetrics = graphData.maxMetrics;
+        extensionColorMap = computeExtensionColors(graphData.nodes);
 
         function updateGraphData(newData) {
             graphData = newData;
             maxMetrics = graphData.maxMetrics || {};
             nodesById = new Map(graphData.nodes.map(n => [n.id, n]));
+            extensionColorMap = computeExtensionColors(graphData.nodes);
             rebuildLinksMap();
             currentPath = '';
             selectedNode = null;
             selectionHistory = [];
             historyIndex = -1;
+            updateLegend();
             updateBreadcrumb();
             renderGraph();
             updateSelection();
@@ -1161,9 +1182,33 @@ def generate_html(data: dict) -> str:
             }
         }
 
-        document.getElementById('legend-file-circle').style.background = FILE_CYAN;
-        var detailCircle = document.getElementById('legend-file-circle-detail');
-        if (detailCircle) detailCircle.style.background = FILE_CYAN;
+        function updateLegend() {
+            const nodes = graphData.nodes || [];
+            const fileCountByExt = {};
+            let folderCount = 0;
+            nodes.forEach(n => {
+                if (n.type === 'folder') folderCount++;
+                else if (n.type === 'file') {
+                    const ext = n.extension || '';
+                    fileCountByExt[ext] = (fileCountByExt[ext] || 0) + 1;
+                }
+            });
+            const extEntries = Object.entries(fileCountByExt)
+                .sort((a, b) => b[1] - a[1] || (a[0] || '').localeCompare(b[0] || ''));
+            const extLabel = (ext) => (ext && ext.startsWith('.')) ? ext.slice(1) : (ext || '?');
+            let html = '';
+            extEntries.forEach(([ext, count]) => {
+                const color = extensionColorMap[ext] || EXTENSION_FALLBACK;
+                const label = escapeAttr(extLabel(ext));
+                html += `<div class="legend-type-row"><div class="legend-swatch" style="background:${color};"></div><span class="legend-ext">${label}</span><span class="legend-count">${count}</span></div>`;
+            });
+            html += `<div class="legend-type-row"><div class="legend-swatch" style="background:${FOLDER_COLOR};"></div><span class="legend-ext">Folder</span><span class="legend-count">${folderCount}</span></div>`;
+            const container = document.getElementById('legend-file-types');
+            const containerDetail = document.getElementById('legend-file-types-detail');
+            if (container) container.innerHTML = html;
+            if (containerDetail) containerDetail.innerHTML = html;
+        }
+        updateLegend();
 
         document.getElementById('legend-expand-btn').addEventListener('click', function () {
             var legend = document.getElementById('legend');
@@ -1230,8 +1275,8 @@ def generate_html(data: dict) -> str:
         });
         
         function getNodeColor(node) {
-            if (node.type === 'folder') return '#7c3aed';
-            return FILE_CYAN;
+            if (node.type === 'folder') return FOLDER_COLOR;
+            return extensionColorMap[node.extension] || EXTENSION_FALLBACK;
         }
 
         function getNodeSize(node) {
@@ -1365,7 +1410,7 @@ def generate_html(data: dict) -> str:
                     .attr('x', width / 2)
                     .attr('y', height / 2)
                     .attr('text-anchor', 'middle')
-                    .attr('fill', '#666')
+                    .attr('fill', '#e7e7ee')
                     .text('Empty folder');
                 return;
             }

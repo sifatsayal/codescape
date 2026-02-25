@@ -1,8 +1,9 @@
-.vscode/**
-.vscode-test/**
+# Source and dev files (only compiled out/ is needed in the .vsix)
 src/**
-.gitignore
 tsconfig.json
-**/*.map
-**/*.ts
-!out/**/*.js
+.gitignore
+*.map
+
+# Dependencies are not bundled; vsce excludes node_modules by default
+# Uncomment if you need to force-exclude something else:
+# node_modules/**

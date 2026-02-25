@@ -59,5 +59,18 @@
     "@types/vscode": "^1.74.0",
     "typescript": "^5.0.0"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "publisher": "win26-team22",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/StanfordCS194/win26-Team22"
+  },
+  "license": "MIT",
+  "keywords": [
+    "visualization",
+    "dependencies",
+    "codebase",
+    "graph",
+    "architecture"
+  ]
 }
