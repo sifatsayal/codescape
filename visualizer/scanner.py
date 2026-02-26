@@ -48,10 +48,10 @@ class RepoScanner:
         if depth > self.config.max_depth or self.file_count > self.config.max_files:
             return None
             
-        rel_path = str(path.relative_to(self.root))
+        rel_path = str(path.relative_to(self.root)).replace('\\', '/')
         if rel_path == '.':
             rel_path = ''
-            
+
         folder_info = {
             'name': path.name or self.root.name,
             'path': rel_path,
@@ -105,7 +105,7 @@ class RepoScanner:
     
     def _analyze_file(self, path: Path) -> Optional[dict]:
         """Extract file metadata."""
-        rel_path = str(path.relative_to(self.root))
+        rel_path = str(path.relative_to(self.root)).replace('\\', '/')
         ext = path.suffix.lower()
         
         file_info = {

@@ -45,23 +45,33 @@ function getImportSpecifiersFromText(text: string): string[] {
   return Array.from(specifiers);
 }
 
-/** Returns workspace-relative path for uri, or null if not under a workspace folder. */
+/** Returns workspace-relative path for uri (forward slashes), or null if not under a workspace folder. */
 function getWorkspaceRelativePath(uri: vscode.Uri): string | null {
   const folder = vscode.workspace.getWorkspaceFolder(uri);
   if (!folder) return null;
   const rel = path.relative(folder.uri.fsPath, uri.fsPath);
-  return rel || '.'; // root is '.'
+  const normalized = (rel || '.').replace(/\\/g, '/');
+  return normalized;
 }
+
+let hasShownVisualizerHintOnce = false;
 
 /** POST pending changes to visualizer /api/rescan (triggers rescan); server stores for side panel. Uses Node http so it works reliably in the extension host. */
 function sendPendingChangesToVisualizer(): Promise<void> {
   return new Promise((resolve) => {
     if (lastServerPort === null) {
+      if (!hasShownVisualizerHintOnce && pendingChanges.length > 0) {
+        hasShownVisualizerHintOnce = true;
+        vscode.window.showInformationMessage(
+          'To see changes in the Codebase Visualizer when you save, open it from the command palette: "Codebase Visualizer: Visualize Codebase".',
+          { modal: false }
+        );
+      }
       resolve();
       return;
     }
     const sendTime = Date.now();
-    const bundle = pendingChanges.filter((c) => c.type !== 'file_body_edited');
+    const bundle = pendingChanges.slice();
     const body = JSON.stringify({ changes: bundle, lastSendTimestamp: sendTime });
     const req = http.request(
       {
@@ -312,6 +322,7 @@ async function visualizeInBrowser(context: vscode.ExtensionContext) {
     // Start Python server (visualizes repoPath = current workspace folder)
     const { port, process } = await bridge.startServer(repoPath, undefined, undefined, visualizerRepoPath);
     lastServerPort = port;
+    hasShownVisualizerHintOnce = false;
 
     statusBarItem.text = '$(check) Visualization ready!';
     statusBarItem.show();

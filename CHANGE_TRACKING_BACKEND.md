@@ -22,16 +22,16 @@ This doc describes the **current backend process** for change tracking and resca
 ## 1. Recording (extension)
 
 - **Where:** `vscode-extension/src/extension.ts`
-- **Subscriptions:**  
-  - `onDidCreateFiles` → file/folder added (we distinguish folder via `knownFolders` / `fs.stat`).  
-  - `onDidDeleteFiles` → file/folder deleted.  
-  - `onDidRenameFiles` → file/folder path_changed / folder_path_changed (with optional `kind`: `'renamed'` | `'moved'`).  
+- **Subscriptions:**
+  - `onDidCreateFiles` → file/folder added (we distinguish folder via `knownFolders` / `fs.stat`).
+  - `onDidDeleteFiles` → file/folder deleted.
+  - `onDidRenameFiles` → file/folder path_changed / folder_path_changed (with optional `kind`: `'renamed'` | `'moved'`).
   - `onDidSaveTextDocument` → we record import diff (import_added / import_removed) using a per-file baseline; we do **not** send `file_body_edited` to the frontend (it’s filtered out before send).
-- **State:**  
-  - `pendingChanges`: array of change events.  
-  - `previousImportsByFile`: last known import specifiers per file (for import diff on save).  
-  - `knownFolders`: paths we’ve seen as directories (for folder vs file on delete/rename).  
-  - `lastServerPort`: port of the visualizer server (set when “Visualize Codebase” runs; cleared when the server process exits).  
+- **State:**
+  - `pendingChanges`: array of change events.
+  - `previousImportsByFile`: last known import specifiers per file (for import diff on save).
+  - `knownFolders`: paths we’ve seen as directories (for folder vs file on delete/rename).
+  - `lastServerPort`: port of the visualizer server (set when “Visualize Codebase” runs; cleared when the server process exits).
   - `lastSendTimestamp`: time of last successful send (used for “Last Cmd+S” in the UI).
 
 ---
@@ -40,10 +40,10 @@ This doc describes the **current backend process** for change tracking and resca
 
 - **Trigger:** Every save (e.g. Cmd+S) in the Extension Development Host.
 - **Action:** Call `sendPendingChangesToVisualizer()`.
-- **Request:**  
-  - **Method/URL:** `POST http://localhost:<lastServerPort>/api/rescan`  
-  - **Body (JSON):** `{ "changes": [ ... ], "lastSendTimestamp": <number> }`  
-  - `changes`: current pending list with **`file_body_edited` removed** (not sent to frontend).  
+- **Request:**
+  - **Method/URL:** `POST http://localhost:<lastServerPort>/api/rescan`
+  - **Body (JSON):** `{ "changes": [ ... ], "lastSendTimestamp": <number> }`
+  - `changes`: current pending list (includes `file_body_edited` so the visualizer can show changed files).
   - `lastSendTimestamp`: current time (ms).
 - **If `lastServerPort` is null** (no visualizer running), the function no-ops and resolves.
 - **On 200:** extension sets `lastSendTimestamp` and clears `pendingChanges`.
@@ -54,20 +54,20 @@ This doc describes the **current backend process** for change tracking and resca
 ## 3. Server APIs (Python visualizer)
 
 - **Where:** `visualizer/server.py` (handler created in `create_handler`).
-- **In-memory state:**  
-  - `last_changes`: list of change objects (last payload from POST /api/rescan).  
-  - `last_send_timestamp`: number from the last POST body (“Last Cmd+S”).  
+- **In-memory state:**
+  - `last_changes`: list of change objects (last payload from POST /api/rescan).
+  - `last_send_timestamp`: number from the last POST body (“Last Cmd+S”).
   - `initial_repo_path`: repo path the server was started with (e.g. by the extension or CLI).
 
 ### Endpoints
 
-| Method | Path | Purpose |
-|--------|------|--------|
-| **POST** | `/api/rescan` | Accept `{ "changes", "lastSendTimestamp" }`, update `last_changes` and `last_send_timestamp`, run full rescan for `initial_repo_path`, return new graph JSON (or 400/500). |
-| **GET**  | `/api/last_changes` | Return `{ "lastSendTimestamp": <number\|null>, "changes": [ ... ] }` for the side panel. |
-| **GET**  | `/api/rescan` | Run same full scan as initial load (files, folders, imports) for `initial_repo_path` and return graph JSON. 400 if no initial path. Used by the browser to refresh the graph after a new save. |
-| **GET**  | `/api/initial_path` | Return `{ "path": "<initial_repo_path>" }` or `{ "path": null }`. Lets the UI know the repo path when the page was opened without `?path=`. |
-| **GET**  | `/api/load?path=<path>` | Run full scan for the given `path` and return graph JSON. Used by “Load repo” in the UI. |
+| Method   | Path                    | Purpose                                                                                                                                                                                        |
+| -------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **POST** | `/api/rescan`           | Accept `{ "changes", "lastSendTimestamp" }`, update `last_changes` and `last_send_timestamp`, run full rescan for `initial_repo_path`, return new graph JSON (or 400/500).                     |
+| **GET**  | `/api/last_changes`     | Return `{ "lastSendTimestamp": <number\|null>, "changes": [ ... ] }` for the side panel.                                                                                                       |
+| **GET**  | `/api/rescan`           | Run same full scan as initial load (files, folders, imports) for `initial_repo_path` and return graph JSON. 400 if no initial path. Used by the browser to refresh the graph after a new save. |
+| **GET**  | `/api/initial_path`     | Return `{ "path": "<initial_repo_path>" }` or `{ "path": null }`. Lets the UI know the repo path when the page was opened without `?path=`.                                                    |
+| **GET**  | `/api/load?path=<path>` | Run full scan for the given `path` and return graph JSON. Used by “Load repo” in the UI.                                                                                                       |
 
 - **Rescan implementation:** Both POST /api/rescan and GET /api/rescan call `load_repo_callback(initial_repo_path)` (in CLI terms: `build_graph_data_for_path`), which: loads config, runs `RepoScanner`, gets files/folders, runs `extract_imports_from_files`, builds `DependencyGraph`, returns `graph.build()`. So it is the same pipeline as the initial open.
 
@@ -77,17 +77,17 @@ This doc describes the **current backend process** for change tracking and resca
 
 Paths are workspace-relative. Optional `timestamp` (ms) can be on any event.
 
-| type | Payload fields | Notes |
-|------|----------------|--------|
-| `file_added` | `path` | |
-| `file_deleted` | `path` | |
-| `file_body_edited` | `path` | **Not sent to frontend** (filtered in extension). |
-| `path_changed` | `oldPath`, `newPath`, `kind`? | `kind`: `'renamed'` \| `'moved'` |
-| `folder_added` | `path` | |
-| `folder_deleted` | `path` | |
-| `folder_path_changed` | `oldPath`, `newPath`, `kind`? | |
-| `import_added` | `fromFile`, `toFile` | |
-| `import_removed` | `fromFile`, `toFile` | |
+| type                  | Payload fields                | Notes                                                           |
+| --------------------- | ----------------------------- | --------------------------------------------------------------- |
+| `file_added`          | `path`                        |                                                                 |
+| `file_deleted`        | `path`                        |                                                                 |
+| `file_body_edited`    | `path`                        | File content saved (sent so visualizer can highlight the file). |
+| `path_changed`        | `oldPath`, `newPath`, `kind`? | `kind`: `'renamed'` \| `'moved'`                                |
+| `folder_added`        | `path`                        |                                                                 |
+| `folder_deleted`      | `path`                        |                                                                 |
+| `folder_path_changed` | `oldPath`, `newPath`, `kind`? |                                                                 |
+| `import_added`        | `fromFile`, `toFile`          |                                                                 |
+| `import_removed`      | `fromFile`, `toFile`          |                                                                 |
 
 Example:
 
@@ -112,13 +112,13 @@ Example:
 
 ## 6. File locations (quick reference)
 
-| What | Where |
-|------|--------|
-| Recording, pending list, send on save | `vscode-extension/src/extension.ts` |
-| POST /api/rescan, GET /api/last_changes, GET /api/rescan, GET /api/initial_path, GET /api/load | `visualizer/server.py` |
-| Full scan (files, folders, imports) | `visualizer/cli.py` (`build_graph_data_for_path`), used by server as `load_repo_callback` |
-| Side panel “Recent changes” + refetch on timestamp change | `visualizer/ui.py` (inline JS: `loadRecentChanges`, GET /api/rescan, then fallback to loadRepo) |
-| Design and payload spec | `CHANGE_TRACKING_PLAN.md` |
+| What                                                                                           | Where                                                                                           |
+| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Recording, pending list, send on save                                                          | `vscode-extension/src/extension.ts`                                                             |
+| POST /api/rescan, GET /api/last_changes, GET /api/rescan, GET /api/initial_path, GET /api/load | `visualizer/server.py`                                                                          |
+| Full scan (files, folders, imports)                                                            | `visualizer/cli.py` (`build_graph_data_for_path`), used by server as `load_repo_callback`       |
+| Side panel “Recent changes” + refetch on timestamp change                                      | `visualizer/ui.py` (inline JS: `loadRecentChanges`, GET /api/rescan, then fallback to loadRepo) |
+| Design and payload spec                                                                        | `CHANGE_TRACKING_PLAN.md`                                                                       |
 
 ---
 

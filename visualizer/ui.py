@@ -289,6 +289,92 @@ def generate_html(data: dict) -> str:
             margin-bottom: 4px;
             word-break: break-all;
         }
+        .recent-changes-git-section {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(100, 100, 150, 0.2);
+        }
+        .recent-changes-git-section .recent-changes-title {
+            margin-bottom: 6px;
+        }
+        .recent-changes-tip {
+            margin-top: 12px;
+            font-size: 10px;
+            color: #6b7280;
+            line-height: 1.35;
+        }
+        .recent-changes-tip strong {
+            color: #9ca3af;
+        }
+        .git-status-line {
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 4px;
+            word-break: break-all;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .git-status-badge {
+            flex-shrink: 0;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .git-status-badge.modified { background: rgba(245, 158, 11, 0.25); color: #fbbf24; }
+        .git-status-badge.added { background: rgba(34, 197, 94, 0.25); color: #4ade80; }
+        .git-status-badge.deleted { background: rgba(239, 68, 68, 0.25); color: #f87171; }
+        .git-status-badge.renamed { background: rgba(59, 130, 246, 0.25); color: #60a5fa; }
+        .git-status-ai-btn {
+            font-size: 10px;
+            padding: 3px 8px;
+            border: 1px solid rgba(59, 130, 246, 0.5);
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 6px;
+            flex-shrink: 0;
+        }
+        .git-status-ai-btn:hover { background: rgba(59, 130, 246, 0.35); }
+        .git-status-ai-summary {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-top: 6px;
+            padding: 8px;
+            background: rgba(20, 20, 35, 0.6);
+            border-radius: 6px;
+            border-left: 2px solid #60a5fa;
+        }
+        .git-status-line-wrap { margin-bottom: 10px; }
+        .change-line-with-desc {
+            margin-bottom: 10px;
+        }
+        .change-line-with-desc .change-line-text {
+            margin-bottom: 4px;
+        }
+        .change-describe-btn {
+            font-size: 11px;
+            padding: 4px 8px;
+            border: 1px solid rgba(245, 158, 11, 0.5);
+            background: rgba(245, 158, 11, 0.2);
+            color: #fbbf24;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 6px;
+        }
+        .change-describe-btn:hover {
+            background: rgba(245, 158, 11, 0.35);
+        }
+        .change-description {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-top: 6px;
+            padding: 8px;
+            background: rgba(20, 20, 35, 0.6);
+            border-radius: 6px;
+            border-left: 2px solid #f59e0b;
+        }
         .details-placeholder {
             color: #888;
             font-style: italic;
@@ -707,6 +793,17 @@ def generate_html(data: dict) -> str:
             filter: url(#node-glow) brightness(1.15);
         }
         
+        .node.changed circle {
+            stroke: #f59e0b;
+            stroke-width: 3px;
+            filter: url(#node-glow) drop-shadow(0 0 8px #f59e0b);
+        }
+        .node.has-changed-child circle {
+            stroke: #f59e0b;
+            stroke-width: 2px;
+            filter: url(#node-glow) drop-shadow(0 0 6px rgba(245, 158, 11, 0.6));
+        }
+        
         .node text {
             font-family: 'JetBrains Mono', monospace;
             font-size: 11px;
@@ -1043,9 +1140,14 @@ def generate_html(data: dict) -> str:
             <div class="details-placeholder">Click a node to view its details</div>
         </div>
         <div id="recent-changes-panel" class="recent-changes-panel">
-            <div class="recent-changes-title">Recent changes (taralyn's step)</div>
+            <div id="recent-changes-title" class="recent-changes-title">Changes in this folder</div>
             <div id="recent-changes-last-send" class="recent-changes-muted">Last Cmd+S: —</div>
             <div id="recent-changes-list" class="recent-changes-list"></div>
+            <div id="recent-changes-git-section" class="recent-changes-git-section">
+                <div id="recent-changes-git-title" class="recent-changes-title">Git working tree</div>
+                <div id="recent-changes-git-list" class="recent-changes-list"></div>
+            </div>
+            <div class="recent-changes-tip">Open via Cursor: <strong>Codebase Visualizer: Visualize Codebase</strong> for live updates on save.</div>
         </div>
     </div>
     
@@ -1067,6 +1169,10 @@ def generate_html(data: dict) -> str:
       <div class="legend-type-row">
         <div class="legend-swatch" style="background:#f59e0b;"></div>
         <span class="legend-ext">Outbound</span>
+      </div>
+      <div class="legend-type-row">
+        <div class="legend-swatch legend-swatch-changed" style="background:#1a1a24; border:2px solid #f59e0b; box-shadow:0 0 8px #f59e0b;"></div>
+        <span class="legend-ext">Changed (working branch)</span>
       </div>
     </div>
   </div>
@@ -1093,6 +1199,13 @@ def generate_html(data: dict) -> str:
         <div class="legend-label">
           <div class="legend-name">Outbound</div>
           <div class="legend-caption">Files this file imports</div>
+        </div>
+        <div class="legend-icon">
+          <div class="legend-circle" style="background:#1a1a24; border:2px solid #f59e0b; box-shadow:0 0 6px rgba(245,158,11,0.6);"></div>
+        </div>
+        <div class="legend-label">
+          <div class="legend-name">Changed (working branch)</div>
+          <div class="legend-caption">File or folder with unsaved or recent changes</div>
         </div>
       </div>
     </div>
@@ -1126,6 +1239,8 @@ def generate_html(data: dict) -> str:
         let folderCountMode = 'direct';  // 'direct' | 'recursive'
         let selectionHistory = [];
         let historyIndex = -1;
+        let lastChangesData = { lastSendTimestamp: null, changes: [] };
+        let gitStatusData = { modified: [], added: [], deleted: [], renamed: [] };
 
         const FOLDER_COLOR = '#7c3aed';
         const EXTENSION_PALETTE = [
@@ -1288,6 +1403,159 @@ def generate_html(data: dict) -> str:
             return Math.max(6, Math.min(50, radius));
         }
         
+        function normPath(p) {
+            return (p || '').replace(/\\\\/g, '/').replace(/^\\//, '').trim();
+        }
+        function getAffectedPathsFromChange(c) {
+            const out = [];
+            if (c.path !== undefined) out.push(c.path);
+            if (c.oldPath !== undefined) out.push(c.oldPath);
+            if (c.newPath !== undefined) out.push(c.newPath);
+            if (c.fromFile !== undefined) out.push(c.fromFile);
+            if (c.toFile !== undefined) out.push(c.toFile);
+            return out.map(normPath).filter(Boolean);
+        }
+        function getChangedPathSet(changes) {
+            const set = new Set();
+            (changes || []).forEach(c => getAffectedPathsFromChange(c).forEach(p => set.add(p)));
+            return set;
+        }
+        function getMergedChangedPathSet() {
+            const set = getChangedPathSet(lastChangesData.changes);
+            const g = gitStatusData;
+            (g.modified || []).forEach(p => set.add(normPath(p)));
+            (g.added || []).forEach(p => set.add(normPath(p)));
+            (g.deleted || []).forEach(p => set.add(normPath(p)));
+            (g.renamed || []).forEach(r => { set.add(normPath(r.oldPath)); set.add(normPath(r.newPath)); });
+            return set;
+        }
+        function getFolderHasChangedChildSet(nodes) {
+            const changedPaths = getMergedChangedPathSet();
+            const folderSet = new Set();
+            (nodes || []).filter(n => n.type === 'folder').forEach(n => {
+                const folderPath = normPath(n.path || n.id);
+                if (!folderPath || folderPath === 'root') return;
+                for (const p of changedPaths) {
+                    if (p === folderPath || p.startsWith(folderPath + '/')) {
+                        folderSet.add(n.id);
+                        break;
+                    }
+                }
+            });
+            if (changedPaths.size > 0) folderSet.add('root');
+            return folderSet;
+        }
+
+        function isChangeInFolder(c, folderPath) {
+            const paths = getAffectedPathsFromChange(c);
+            if (!folderPath) return paths.length > 0;
+            return paths.some(p => p === folderPath || p.startsWith(folderPath + '/'));
+        }
+        
+        function isPathInFolder(p, folderPath) {
+            const norm = normPath(p);
+            if (!folderPath) return true;
+            return norm === folderPath || norm.startsWith(folderPath + '/');
+        }
+        let filteredChangesForPanel = [];
+        function updateChangesInFolderPanel() {
+            const titleEl = document.getElementById('recent-changes-title');
+            const listEl = document.getElementById('recent-changes-list');
+            const gitTitleEl = document.getElementById('recent-changes-git-title');
+            const gitListEl = document.getElementById('recent-changes-git-list');
+            if (!titleEl || !listEl) return;
+            const folderPath = currentPath || '';
+            if (titleEl) titleEl.textContent = folderPath ? 'Changes in this folder' : 'Changes in repo';
+            const changes = lastChangesData.changes || [];
+            filteredChangesForPanel = changes.filter(c => isChangeInFolder(c, folderPath));
+            if (filteredChangesForPanel.length === 0) {
+                listEl.innerHTML = '';
+            } else {
+                listEl.innerHTML = filteredChangesForPanel.map(function(c, i) {
+                    const lineText = formatChangeLine(c).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    return '<div class="change-line-with-desc" data-index="' + i + '">' +
+                        '<div class="change-line-text">' + lineText + '</div>' +
+                        '<button type="button" class="change-describe-btn" onclick="describeChange(this)">Describe</button>' +
+                        '<div class="change-description" style="display:none;"></div></div>';
+                }).join('');
+            }
+            if (gitTitleEl && gitListEl) {
+                const g = gitStatusData;
+                const mod = (g.modified || []).filter(p => isPathInFolder(p, folderPath));
+                const add = (g.added || []).filter(p => isPathInFolder(p, folderPath));
+                const del_ = (g.deleted || []).filter(p => isPathInFolder(p, folderPath));
+                const ren = (g.renamed || []).filter(r => isPathInFolder(r.oldPath, folderPath) || isPathInFolder(r.newPath, folderPath));
+                const total = mod.length + add.length + del_.length + ren.length;
+                gitTitleEl.textContent = folderPath ? 'Git working tree (this folder)' : 'Git working tree';
+                if (total === 0) {
+                    gitListEl.innerHTML = '<div class="recent-changes-muted">No uncommitted changes</div>';
+                } else {
+                    let html = '';
+                    function gitLine(path, status, label) {
+                        return '<div class="git-status-line-wrap"><div class="git-status-line">' +
+                            '<span class="git-status-badge ' + status + '">' + (status === 'modified' ? 'M' : status === 'added' ? 'A' : status === 'deleted' ? 'D' : 'R') + '</span>' +
+                            '<span>' + escapeAttr(label || path) + '</span>' +
+                            '<button type="button" class="git-status-ai-btn" onclick="describeFileChange(this)" data-path="' + escapeAttr(path) + '" data-status="' + (status === 'modified' ? 'M' : status === 'added' ? 'A' : status === 'deleted' ? 'D' : 'R') + '">AI Summarize</button></div>' +
+                            '<div class="git-status-ai-summary" style="display:none;"></div></div>';
+                    }
+                    mod.forEach(p => { html += gitLine(p, 'modified', p); });
+                    add.forEach(p => { html += gitLine(p, 'added', p); });
+                    del_.forEach(p => { html += gitLine(p, 'deleted', p); });
+                    ren.forEach(r => { html += gitLine(r.newPath, 'renamed', r.oldPath + ' → ' + r.newPath); });
+                    gitListEl.innerHTML = html;
+                }
+            }
+        }
+        
+        async function describeChange(btn) {
+            const row = btn.closest('.change-line-with-desc');
+            if (!row) return;
+            const idx = parseInt(row.getAttribute('data-index'), 10);
+            if (isNaN(idx) || idx < 0 || idx >= filteredChangesForPanel.length) return;
+            const change = filteredChangesForPanel[idx];
+            const descEl = row.querySelector('.change-description');
+            if (!descEl) return;
+            btn.disabled = true;
+            descEl.style.display = 'block';
+            descEl.textContent = 'Loading…';
+            try {
+                const resp = await fetch(window.location.origin + '/api/describe_change', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ change: change })
+                });
+                const data = await resp.json();
+                descEl.textContent = data.description || (data.error ? 'Error: ' + data.error : 'No description.');
+            } catch (e) {
+                descEl.textContent = 'Error: ' + e.message;
+            }
+            btn.disabled = false;
+        }
+        
+        async function describeFileChange(btn) {
+            const path = btn.getAttribute('data-path');
+            const status = btn.getAttribute('data-status') || 'M';
+            if (!path) return;
+            const wrap = btn.closest('.git-status-line-wrap');
+            const summaryEl = wrap ? wrap.querySelector('.git-status-ai-summary') : null;
+            if (!summaryEl) return;
+            summaryEl.style.display = 'block';
+            summaryEl.textContent = 'Loading…';
+            btn.disabled = true;
+            try {
+                const resp = await fetch(window.location.origin + '/api/describe_file_change', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: path, status: status })
+                });
+                const data = await resp.json();
+                summaryEl.textContent = data.description || (data.error ? 'Error: ' + data.error : 'No summary.');
+            } catch (e) {
+                summaryEl.textContent = 'Error: ' + e.message;
+            }
+            btn.disabled = false;
+        }
+        
         function navigateTo(path, clearPanel) {
             if (clearPanel) selectedNode = null;
             pushHistory(path || '');
@@ -1391,6 +1659,9 @@ def generate_html(data: dict) -> str:
         function renderGraph() {
             g.selectAll('*').remove();
             
+            const changedPathSet = getMergedChangedPathSet();
+            const folderHasChangedChildSet = getFolderHasChangedChildSet(graphData.nodes);
+            
             // Get current folder
             const currentFolder = nodesById.get(currentPath || 'root');
             if (!currentFolder || !currentFolder.children) return;
@@ -1438,7 +1709,13 @@ def generate_html(data: dict) -> str:
                 .selectAll('g')
                 .data(visibleNodes)
                 .join('g')
-                .attr('class', d => `node ${selectedNode && d.id === selectedNode.id ? 'selected' : ''}`)
+                .attr('class', d => {
+                    let cls = 'node';
+                    if (selectedNode && d.id === selectedNode.id) cls += ' selected';
+                    if (d.type === 'file' && changedPathSet.has(normPath(d.id))) cls += ' changed';
+                    if (d.type === 'folder' && folderHasChangedChildSet.has(d.id)) cls += ' has-changed-child';
+                    return cls;
+                })
                 .attr('data-id', d => d.id)
                 .call(d3.drag()
                     .on('start', dragstarted)
@@ -1731,12 +2008,14 @@ def generate_html(data: dict) -> str:
             const panel = document.getElementById('details-panel');
             if (selectedNode) {
                 panel.innerHTML = getCardHTML(selectedNode);
+                updateChangesInFolderPanel();
                 return;
             }
             if (currentPath) {
                 const folderNode = nodesById.get(currentPath);
                 if (folderNode) {
                     panel.innerHTML = getCardHTML(folderNode);
+                    updateChangesInFolderPanel();
                     return;
                 }
             }
@@ -1750,6 +2029,7 @@ def generate_html(data: dict) -> str:
                     <div class="stat"><span>Lines of code</span><span class="stat-value">${loc}</span></div>
                 </div>
             `;
+            updateChangesInFolderPanel();
         }
         
         const sidebarBackBtn = document.getElementById('sidebar-back-btn');
@@ -1760,8 +2040,9 @@ def generate_html(data: dict) -> str:
         // Initial render
         renderGraph();
         updateSidebarNav();
+        updateChangesInFolderPanel();
 
-        // Recent changes (taralyn's step) — raw list from extension, shown in grey
+        // Recent changes — poll and update graph/panel
         function formatChangeLine(c) {
             const k = c.kind ? ' (' + c.kind + ')' : '';
             if (c.path !== undefined) return c.type + ': ' + c.path + k;
@@ -1774,22 +2055,31 @@ def generate_html(data: dict) -> str:
             const lastEl = document.getElementById('recent-changes-last-send');
             const listEl = document.getElementById('recent-changes-list');
             if (!lastEl || !listEl) return;
-            fetch(window.location.origin + '/api/last_changes')
-                .then(function(r) { return r.ok ? r.json() : null; })
-                .then(function(data) {
-                    if (!data) return;
-                    const ts = data.lastSendTimestamp;
-                    lastEl.textContent = 'Last Cmd+S: ' + (ts == null ? 'Never' : new Date(ts).toISOString());
-                    const changes = data.changes || [];
-                    listEl.innerHTML = changes.length === 0
-                        ? ''
-                        : changes.map(function(c) {
-                            return '<div class="change-line">' + formatChangeLine(c).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
-                        }).join('');
-                    // When extension sent a new bundle (timestamp changed), refetch graph (same full scan as initial open: files, folders, imports)
-                    if (ts !== lastSeenSendTimestamp) {
-                        lastSeenSendTimestamp = ts;
-                        fetch(window.location.origin + '/api/rescan')
+            const origin = window.location.origin;
+            Promise.all([
+                fetch(origin + '/api/last_changes').then(function(r) { return r.ok ? r.json() : null; }),
+                fetch(origin + '/api/git_status').then(function(r) { return r.ok ? r.json() : null; })
+            ]).then(function(results) {
+                const data = results[0];
+                const gitData = results[1];
+                if (gitData) {
+                    gitStatusData.modified = gitData.modified || [];
+                    gitStatusData.added = gitData.added || [];
+                    gitStatusData.deleted = gitData.deleted || [];
+                    gitStatusData.renamed = gitData.renamed || [];
+                }
+                if (!data) { updateChangesInFolderPanel(); renderGraph(); updateSelection(); return; }
+                const ts = data.lastSendTimestamp;
+                const changes = data.changes || [];
+                lastChangesData.changes = changes;
+                lastChangesData.lastSendTimestamp = ts;
+                lastEl.textContent = 'Last Cmd+S: ' + (ts == null ? 'Never' : new Date(ts).toISOString());
+                updateChangesInFolderPanel();
+                renderGraph();
+                updateSelection();
+                if (ts !== lastSeenSendTimestamp) {
+                    lastSeenSendTimestamp = ts;
+                    fetch(origin + '/api/rescan')
                             .then(function(r) {
                                 if (r.ok) return r.json();
                                 if (r.status === 400) return null;
@@ -1818,12 +2108,18 @@ def generate_html(data: dict) -> str:
                                 }
                             })
                             .catch(function() {});
-                    }
-                })
-                .catch(function() {});
+                }
+            }).catch(function() {
+                updateChangesInFolderPanel();
+                renderGraph();
+                updateSelection();
+            });
         }
         loadRecentChanges();
-        setInterval(loadRecentChanges, 3000);
+        setInterval(loadRecentChanges, 2000);
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') loadRecentChanges();
+        });
     </script>
 </body>
 </html>'''
