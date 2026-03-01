@@ -182,6 +182,7 @@ def generate_html(data: dict) -> str:
             left: 0;
             right: 380px;
             bottom: 0;
+            background: #0a0a12;
         }
 
         #sidebar {
@@ -783,6 +784,15 @@ def generate_html(data: dict) -> str:
             filter: url(#node-glow);
         }
         
+        .node.folder circle {
+            fill: #374151;
+            stroke: #111;
+        }
+        
+        .node.file circle {
+            stroke: rgba(0, 0, 0, 0.4);
+        }
+        
         .node.selected circle {
             stroke-width: 4px;
             filter: url(#node-glow) brightness(1.2) drop-shadow(0 0 10px currentColor);
@@ -806,9 +816,15 @@ def generate_html(data: dict) -> str:
         
         .node text {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
             fill: #e7e7ee;
             pointer-events: none;
+        }
+        
+        .node text.node-label-inside {
+            font-size: 12px;
+            fill: #e7e7ee;
+            text-anchor: middle;
+            dominant-baseline: central;
         }
         
         .link {
@@ -1160,6 +1176,7 @@ def generate_html(data: dict) -> str:
       </button>
   </div>
   <div class="legend-simple">
+    <div class="legend-section-title">Scripting languages</div>
     <div id="legend-file-types" class="legend-types"></div>
     <div class="legend-deps-compact">
       <div class="legend-type-row">
@@ -1177,6 +1194,7 @@ def generate_html(data: dict) -> str:
     </div>
   </div>
   <div class="legend-detailed legend-body">
+    <div class="legend-section-title">Scripting languages</div>
     <div id="legend-file-types-detail" class="legend-types"></div>
     <div class="legend-section legend-divider">
       <div class="legend-section-title">Dependencies</div>
@@ -1401,6 +1419,12 @@ def generate_html(data: dict) -> str:
             // Linear mapping so size differences are obvious: radius 6 (low) to 50 (high)
             const radius = 6 + normalized * 44;
             return Math.max(6, Math.min(50, radius));
+        }
+        
+        function getPackRadius(node) {
+            const base = getNodeSize(node);
+            const minR = node.type === 'folder' ? 60 : 28;
+            return Math.max(minR, base);
         }
         
         function normPath(p) {
@@ -1658,6 +1682,8 @@ def generate_html(data: dict) -> str:
         
         function renderGraph() {
             g.selectAll('*').remove();
+            const width = document.getElementById('graph-container').clientWidth;
+            const height = document.getElementById('graph-container').clientHeight;
             
             const changedPathSet = getMergedChangedPathSet();
             const folderHasChangedChildSet = getFolderHasChangedChildSet(graphData.nodes);
@@ -1686,41 +1712,72 @@ def generate_html(data: dict) -> str:
                 return;
             }
             
-            // Create force simulation
-            simulation = d3.forceSimulation(visibleNodes)
-                .force('link', d3.forceLink(visibleLinks).id(d => d.id).distance(120).strength(0.3))
-                .force('charge', d3.forceManyBody().strength(-400))
-                .force('center', d3.forceCenter(width / 2, height / 2))
-                .force('collision', d3.forceCollide().radius(d => getNodeSize(d) + 25));
+            // Pack layout: assign value (area) and run d3.pack
+            simulation = null;
+            visibleNodes.forEach(n => { n.value = getPackRadius(n) * getPackRadius(n); });
+            const root = { children: visibleNodes };
+            const hierarchy = d3.hierarchy(root).sum(d => d.value ?? 0);
+            const PACK_PADDING = 12;
+            d3.pack().size([width, height]).padding(PACK_PADDING)(hierarchy);
+            hierarchy.children.forEach(c => {
+                c.data.x = c.x;
+                c.data.y = c.y;
+                c.data.r = c.r;
+            });
             
-            // Draw links (initially hidden, shown based on selection)
+            // Resolve link source/target to node objects (with x, y, r)
+            const nodeById = new Map(visibleNodes.map(n => [n.id, n]));
+            visibleLinks.forEach(l => {
+                const srcId = typeof l.source === 'object' && l.source !== null ? l.source.id : l.source;
+                const tgtId = typeof l.target === 'object' && l.target !== null ? l.target.id : l.target;
+                if (nodeById.has(srcId)) l.source = nodeById.get(srcId);
+                if (nodeById.has(tgtId)) l.target = nodeById.get(tgtId);
+            });
+            const resolvedLinks = visibleLinks.filter(l => l.source && l.target && l.source.x != null && l.target.x != null);
+            
+            // Draw links (positions from pack; shortened at target)
             const link = g.append('g')
                 .attr('class', 'links')
                 .selectAll('line')
-                .data(visibleLinks)
+                .data(resolvedLinks)
                 .join('line')
                 .attr('class', d => `link ${d.type}`)
                 .attr('stroke-width', 2)
-                .attr('marker-end', 'url(#arrowhead)');
+                .attr('marker-end', 'url(#arrowhead)')
+                .attr('x1', d => d.source && d.source.x != null ? d.source.x : 0)
+                .attr('y1', d => d.source && d.source.y != null ? d.source.y : 0)
+                .attr('x2', d => {
+                    if (!d.target || d.target.x == null) return 0;
+                    const dx = d.target.x - (d.source?.x ?? 0);
+                    const dy = d.target.y - (d.source?.y ?? 0);
+                    const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+                    const targetR = (d.target.r != null ? d.target.r : getPackRadius(d.target)) + 5;
+                    return d.target.x - (dx/dist) * targetR;
+                })
+                .attr('y2', d => {
+                    if (!d.target || d.target.y == null) return 0;
+                    const dx = d.target.x - (d.source?.x ?? 0);
+                    const dy = d.target.y - (d.source?.y ?? 0);
+                    const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+                    const targetR = (d.target.r != null ? d.target.r : getPackRadius(d.target)) + 5;
+                    return d.target.y - (dy/dist) * targetR;
+                });
             
-            // Draw nodes
+            // Draw nodes (circle + folder label outside / file label inside)
             const node = g.append('g')
                 .attr('class', 'nodes')
                 .selectAll('g')
                 .data(visibleNodes)
                 .join('g')
                 .attr('class', d => {
-                    let cls = 'node';
+                    let cls = 'node ' + (d.type === 'folder' ? 'folder' : 'file');
                     if (selectedNode && d.id === selectedNode.id) cls += ' selected';
                     if (d.type === 'file' && changedPathSet.has(normPath(d.id))) cls += ' changed';
                     if (d.type === 'folder' && folderHasChangedChildSet.has(d.id)) cls += ' has-changed-child';
                     return cls;
                 })
                 .attr('data-id', d => d.id)
-                .call(d3.drag()
-                    .on('start', dragstarted)
-                    .on('drag', dragged)
-                    .on('end', dragended))
+                .attr('transform', d => `translate(${d.x},${d.y})`)
                 .on('click', (event, d) => {
                     event.stopPropagation();
                     selectedNode = d;
@@ -1739,74 +1796,22 @@ def generate_html(data: dict) -> str:
                 });
             
             node.append('circle')
-                .attr('r', d => getNodeSize(d))
-                .attr('fill', d => getNodeColor(d))
-                .attr('stroke', d => d3.color(getNodeColor(d))?.darker(0.5) || '#333');
+                .attr('r', d => d.r)
+                .attr('fill', d => d.type === 'folder' ? '#374151' : getNodeColor(d))
+                .attr('stroke', d => d.type === 'folder' ? '#111' : (d3.color(getNodeColor(d))?.darker(0.5) || '#333'));
             
-            node.append('text')
-                .attr('dy', d => getNodeSize(d) + 14)
-                .attr('text-anchor', 'middle')
-                .text(d => d.name.length > 20 ? d.name.slice(0, 18) + '...' : d.name);
-            
-            // Folder icon: glassy silver icon centered in node (scale then translate so symbol center 12,12 lands at 0,0)
-            node.filter(d => d.type === 'folder')
-                .append('g')
-                .attr('class', 'folder-icon')
-                .attr('transform', d => {
-                    const s = (1.2 * getNodeSize(d)) / 24;
-                    const tx = -12 * s;
-                    const ty = -12 * s;
-                    return `translate(${tx},${ty}) scale(${s})`;
-                })
-                .append('use')
-                .attr('href', '#folder-icon')
-                .attr('x', 0)
-                .attr('y', 0)
-                .attr('width', 24)
-                .attr('height', 24);
-            
-            simulation.on('tick', () => {
-                link
-                    .attr('x1', d => d.source.x)
-                    .attr('y1', d => d.source.y)
-                    .attr('x2', d => {
-                        // Shorten line to not overlap with target node
-                        const dx = d.target.x - d.source.x;
-                        const dy = d.target.y - d.source.y;
-                        const dist = Math.sqrt(dx*dx + dy*dy);
-                        const targetR = getNodeSize(d.target);
-                        return d.target.x - (dx/dist) * (targetR + 5);
-                    })
-                    .attr('y2', d => {
-                        const dx = d.target.x - d.source.x;
-                        const dy = d.target.y - d.source.y;
-                        const dist = Math.sqrt(dx*dx + dy*dy);
-                        const targetR = getNodeSize(d.target);
-                        return d.target.y - (dy/dist) * (targetR + 5);
-                    });
-                
-                node.attr('transform', d => `translate(${d.x},${d.y})`);
+            // All nodes: label inside circle, centered, 12px, truncated to fit
+            node.each(function(d) {
+                const maxChars = Math.max(1, Math.floor((d.r * 1.6) / 7));
+                const label = d.name.length > maxChars ? d.name.slice(0, maxChars - 3) + '...' : d.name;
+                d3.select(this).append('text')
+                    .attr('class', 'node-label-inside')
+                    .attr('x', 0)
+                    .attr('y', 0)
+                    .text(label);
             });
             
-            // Restore selection visual state
             updateSelection();
-            
-            function dragstarted(event) {
-                if (!event.active) simulation.alphaTarget(0.3).restart();
-                event.subject.fx = event.subject.x;
-                event.subject.fy = event.subject.y;
-            }
-            
-            function dragged(event) {
-                event.subject.fx = event.x;
-                event.subject.fy = event.y;
-            }
-            
-            function dragended(event) {
-                if (!event.active) simulation.alphaTarget(0);
-                event.subject.fx = null;
-                event.subject.fy = null;
-            }
         }
         
         function updateSelection() {
