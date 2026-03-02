@@ -2,6 +2,7 @@ import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as nodeProcess from 'process';
+import * as vscode from 'vscode';
 
 
 export interface GraphData {
@@ -28,6 +29,16 @@ export interface PythonBridgeOptions {
   pythonPath: string;
   repoPath: string;
   configPath?: string;
+}
+
+/** Build env for spawned Python process: inherit process env and inject OPENAI_API_KEY from VS Code setting if set. */
+function getSpawnEnv(): NodeJS.ProcessEnv {
+  const env = { ...nodeProcess.env };
+  const apiKey = vscode.workspace.getConfiguration('codebaseVisualizer').get<string>('openaiApiKey');
+  if (apiKey && apiKey.trim()) {
+    env.OPENAI_API_KEY = apiKey.trim();
+  }
+  return env;
 }
 
 export class PythonBridge {
@@ -107,6 +118,7 @@ export class PythonBridge {
       const process = spawn(this.pythonPath, args, {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
+        env: getSpawnEnv(),
       });
 
       let stdout = '';
@@ -189,10 +201,12 @@ export class PythonBridge {
 
       const cwd = visualizerRepoPath || repoPath;
 
+      const env = getSpawnEnv();
+      env.PYTHONUNBUFFERED = '1';
       const process = spawn(this.pythonPath, args, {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...nodeProcess.env, PYTHONUNBUFFERED: '1' },
+        env,
       });
 
       let stdout = '';
@@ -254,6 +268,7 @@ export class PythonBridge {
       const process = spawn(this.pythonPath, args, {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
+        env: getSpawnEnv(),
       });
 
       let stderr = '';

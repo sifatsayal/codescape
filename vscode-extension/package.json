@@ -45,6 +45,11 @@
           "type": "string",
           "default": "",
           "description": "Path to the visualizer repo (win26-Team22) if not pip-installed. Leave empty if you ran 'pip install -e .' from that repo."
+        },
+        "codebaseVisualizer.openaiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "OpenAI API key for AI-powered features (e.g. hover file summaries). Passed to the visualizer as OPENAI_API_KEY. Leave empty to use the OPENAI_API_KEY environment variable if set."
         }
       }
     }

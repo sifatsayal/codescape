@@ -146,6 +146,72 @@ def _describe_file_change_with_ai(repo_path, relative_path, status):
     return "File modified."
 
 
+def _summarize_file_with_ai(repo_path, relative_path):
+    """Return a 2–3 sentence summary of what this file does and its role in the codebase."""
+    path = (relative_path or "").replace("\\", "/").strip()
+    if not path:
+        return None
+    repo = Path(repo_path).resolve()
+    full_path = (repo / path).resolve()
+    try:
+        print(f"[summarize_file] repo={repo} relative={path} full={full_path}")
+    except Exception:
+        pass
+    try:
+        if not full_path.is_file():
+            try:
+                print(f"[summarize_file] Not a file: {full_path}")
+            except Exception:
+                pass
+            return None
+        with open(full_path, encoding="utf-8", errors="ignore") as f:
+            content = f.read()
+    except Exception:
+        return None
+    if not content:
+        return None
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        try:
+            print("[summarize_file] OPENAI_API_KEY not set")
+        except Exception:
+            pass
+        return None
+    try:
+        import urllib.request
+        max_chars = 6000
+        truncated = content[:max_chars] + ("..." if len(content) > max_chars else "")
+        prompt = (
+            "In exactly 1-2 sentences, describe what this file does. "
+            "Be direct and technical. No filler phrases like 'this file serves as' "
+            "or 'this document provides'. Just state what it does.\n\n"
+            f"File path: {path}\n\n"
+            f"File contents:\n{truncated}"
+        )
+        req = urllib.request.Request(
+            "https://api.openai.com/v1/chat/completions",
+            data=json.dumps(
+                {
+                    "model": "gpt-4o-mini",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 160,
+                }
+            ).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + api_key,
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            choices = result.get("choices", [])
+            if choices and choices[0].get("message", {}).get("content"):
+                return choices[0]["message"]["content"].strip()
+    except Exception:
+        return None
+
+
 def _describe_change_rule_based(change):
     """Return a short human-readable description of a change event (rule-based, no LLM)."""
     if not change or not isinstance(change, dict):
@@ -247,11 +313,14 @@ def create_handler(html_content, load_repo_callback=None, initial_repo_path=None
     # Store last received changes and timestamp for visualizer side panel
     last_changes = []
     last_send_timestamp = None  # from extension "Last Cmd+S"
+    # Track the currently active repo path (updated by /api/load). Fall back to initial_repo_path.
+    current_repo_path = initial_repo_path
 
     class VisualizationHandler(http.server.SimpleHTTPRequestHandler):
         """Custom HTTP handler to serve the visualization HTML."""
 
         def do_GET(self):
+            nonlocal current_repo_path
             parsed = urlparse(self.path)
             if parsed.path == '/api/browse':
                 path = _run_folder_picker()
@@ -270,11 +339,33 @@ def create_handler(html_content, load_repo_callback=None, initial_repo_path=None
                 self._send_json(200, {'path': initial_repo_path} if initial_repo_path else {'path': None})
                 return
             if parsed.path == '/api/git_status':
-                repo = initial_repo_path
+                repo = current_repo_path or initial_repo_path
                 if not repo:
                     self._send_json(200, {'modified': [], 'added': [], 'deleted': [], 'renamed': []})
                     return
                 self._send_json(200, _git_status_paths(repo))
+                return
+            if parsed.path == '/api/summarize_file':
+                query = parse_qs(parsed.query)
+                path_list = query.get('path')
+                path = (path_list[0] if path_list else '').strip().replace('\\', '/')
+                if not path:
+                    self._send_json(400, {'error': 'Missing path parameter'})
+                    return
+                repo = current_repo_path or initial_repo_path
+                if not repo:
+                    self._send_json(400, {'error': 'No repo path (start visualizer with --repo)'})
+                    return
+                summary = _summarize_file_with_ai(repo, path)
+                try:
+                    full_path = (Path(repo).resolve() / path).resolve()
+                    exists = full_path.is_file()
+                    print(f"[summarize_file endpoint] path={path} full_path={full_path} exists={exists} summary={repr(summary)}")
+                except Exception:
+                    pass
+                if not summary:
+                    summary = 'No summary available.'
+                self._send_json(200, {'summary': summary})
                 return
             if parsed.path == '/api/rescan':
                 # Same as initial load: full scan (files, folders, imports) for the repo we started with
@@ -302,6 +393,8 @@ def create_handler(html_content, load_repo_callback=None, initial_repo_path=None
                     if isinstance(data, dict) and 'error' in data:
                         self._send_json(400, data)
                     else:
+                        # Update the active repo path when a new repo is successfully loaded.
+                        current_repo_path = path
                         self._send_json(200, data)
                 except Exception as e:
                     self._send_json(500, {'error': str(e)})

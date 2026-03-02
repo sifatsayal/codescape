@@ -238,6 +238,68 @@ def generate_html(data: dict) -> str:
             z-index: 120;
             display: none;
         }
+        .node-tooltip {
+            position: fixed;
+            max-width: 320px;
+            background: rgba(15, 15, 25, 0.97);
+            color: #e5e7eb;
+            border-radius: 10px;
+            border: 1px solid rgba(100, 100, 150, 0.5);
+            box-shadow: 0 18px 45px rgba(0, 0, 0, 0.75);
+            padding: 10px 12px;
+            font-size: 12px;
+            z-index: 160;
+            pointer-events: auto;
+        }
+        .node-tooltip-header {
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #e5e7eb;
+        }
+        .node-tooltip-subtitle {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-bottom: 6px;
+        }
+        .node-tooltip-meta-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: #9ca3af;
+        }
+        .node-tooltip-meta-row + .node-tooltip-meta-row {
+            margin-top: 2px;
+        }
+        .node-tooltip-divider {
+            margin: 8px 0;
+            height: 1px;
+            background: rgba(55, 65, 81, 0.9);
+        }
+        .node-tooltip-summary {
+            font-size: 12px;
+            color: #d1d5db;
+            line-height: 1.4;
+        }
+        .node-tooltip-summary-loading {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #9ca3af;
+        }
+        .node-tooltip-spinner {
+            width: 12px;
+            height: 12px;
+            border-radius: 999px;
+            border: 2px solid #4b5563;
+            border-top-color: #e5e7eb;
+            animation: nodeTooltipSpin 0.8s linear infinite;
+        }
+        @keyframes nodeTooltipSpin {
+            to { transform: rotate(360deg); }
+        }
         .search-result-item {
             display: flex;
             align-items: flex-start;
@@ -1426,6 +1488,10 @@ def generate_html(data: dict) -> str:
         ];
         const EXTENSION_FALLBACK = '#64748b';
         let extensionColorMap = {};  // extension -> hex, computed from graphData.nodes
+        const fileSummaryCache = new Map();  // path -> { summary: string, loading: boolean }
+        let nodeTooltipEl = null;
+        let nodeTooltipTimer = null;
+        let nodeTooltipNodeId = null;
 
         function computeExtensionColors(nodes) {
             const exts = [...new Set(nodes.filter(n => n.type === 'file').map(n => n.extension || '').filter(Boolean))].sort();
@@ -1453,6 +1519,133 @@ def generate_html(data: dict) -> str:
             updateSelection();
             renderSidePanel();
             updateSidebarNav();
+        }
+
+        function ensureNodeTooltipElement() {
+            if (nodeTooltipEl) return nodeTooltipEl;
+            const el = document.createElement('div');
+            el.className = 'node-tooltip';
+            el.style.display = 'none';
+            el.addEventListener('mouseenter', () => {
+                cancelNodeTooltipTimer();
+            });
+            el.addEventListener('mouseleave', (e) => {
+                hideNodeTooltip();
+            });
+            document.body.appendChild(el);
+            nodeTooltipEl = el;
+            return el;
+        }
+        function hideNodeTooltip() {
+            if (nodeTooltipEl) {
+                nodeTooltipEl.style.display = 'none';
+            }
+            nodeTooltipNodeId = null;
+        }
+        function cancelNodeTooltipTimer() {
+            if (nodeTooltipTimer) {
+                clearTimeout(nodeTooltipTimer);
+                nodeTooltipTimer = null;
+            }
+        }
+        async function fetchFileSummary(path) {
+            try {
+                const resp = await fetch(window.location.origin + '/api/summarize_file?path=' + encodeURIComponent(path));
+                const data = await resp.json();
+                if (data && typeof data.summary === 'string') {
+                    return data.summary;
+                }
+            } catch (e) {
+                // ignore
+            }
+            return 'No summary available.';
+        }
+        function buildTooltipHTMLForNode(node, summaryState) {
+            const isFile = node.type === 'file';
+            const name = escapeAttr(node.name || '');
+            const path = escapeAttr(node.path || node.id || '');
+            let header = name;
+            let subtitle = '';
+            if (isFile) {
+                const lang = node.language || '';
+                subtitle = lang ? `${lang} • ${path}` : path;
+            } else {
+                subtitle = path || '(folder)';
+            }
+            let html = `<div class="node-tooltip-header">${header}</div>`;
+            if (subtitle) {
+                html += `<div class="node-tooltip-subtitle">${subtitle}</div>`;
+            }
+            if (isFile) {
+                const loc = node.loc != null ? node.loc.toLocaleString() : '0';
+                const inbound = Array.isArray(node.dependents) ? node.dependents.length : 0;
+                const outbound = Array.isArray(node.dependencies) ? node.dependencies.length : 0;
+                html += `<div class="node-tooltip-meta-row"><span>Lines of code</span><span>${loc}</span></div>`;
+                html += `<div class="node-tooltip-meta-row"><span>Inbound (imports this)</span><span>${inbound}</span></div>`;
+                html += `<div class="node-tooltip-meta-row"><span>Outbound (imports)</span><span>${outbound}</span></div>`;
+                html += `<div class="node-tooltip-divider"></div>`;
+                const hasSummary = summaryState && typeof summaryState.summary === 'string' && summaryState.summary.trim() !== '';
+                if (hasSummary) {
+                    html += `<div id="node-tooltip-summary" class="node-tooltip-summary">${escapeAttr(summaryState.summary)}</div>`;
+                } else {
+                    html += `<div id="node-tooltip-summary" class="node-tooltip-summary node-tooltip-summary-loading">
+                        <span class="node-tooltip-spinner"></span>
+                        <span>Generating AI summary…</span>
+                    </div>`;
+                }
+            } else {
+                const directFiles = node.directFileCount != null ? node.directFileCount : 0;
+                const subfolders = node.subfolderCount != null ? node.subfolderCount : 0;
+                html += `<div class="node-tooltip-meta-row"><span>Direct files</span><span>${directFiles}</span></div>`;
+                html += `<div class="node-tooltip-meta-row"><span>Subfolders</span><span>${subfolders}</span></div>`;
+            }
+            return html;
+        }
+        function showNodeTooltipForNode(node, event) {
+            const el = ensureNodeTooltipElement();
+            nodeTooltipNodeId = node.id;
+            const isFile = node.type === 'file';
+            const path = node.path || node.id || '';
+            const summaryState = isFile && path ? fileSummaryCache.get(path) : null;
+            el.innerHTML = buildTooltipHTMLForNode(node, summaryState);
+            const offset = 14;
+            const x = (event.clientX || 0) + offset;
+            const y = (event.clientY || 0) + offset;
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            el.style.display = 'block';
+            if (isFile && path) {
+                if (!summaryState || (!summaryState.summary && !summaryState.loading)) {
+                    fileSummaryCache.set(path, { summary: '', loading: true });
+                    (async () => {
+                        const summary = await fetchFileSummary(path);
+                        fileSummaryCache.set(path, { summary, loading: false });
+                        if (nodeTooltipNodeId === node.id && nodeTooltipEl) {
+                            const summaryEl = nodeTooltipEl.querySelector('#node-tooltip-summary');
+                            if (summaryEl) {
+                                summaryEl.classList.remove('node-tooltip-summary-loading');
+                                summaryEl.innerText = summary;
+                            }
+                        }
+                    })();
+                }
+            }
+        }
+        function handleNodeMouseOver(event, node) {
+            cancelNodeTooltipTimer();
+            nodeTooltipTimer = setTimeout(() => {
+                showNodeTooltipForNode(node, event);
+            }, 600);
+        }
+        function handleNodeMouseOut(event, node) {
+            cancelNodeTooltipTimer();
+            const rt = event.relatedTarget;
+            if (nodeTooltipEl && rt && nodeTooltipEl.contains(rt)) {
+                return;
+            }
+            if (nodeTooltipNodeId === node.id) {
+                hideNodeTooltip();
+            }
         }
 
         async function loadRepo() {
@@ -1952,6 +2145,7 @@ def generate_html(data: dict) -> str:
         
         function renderGraph() {
             g.selectAll('*').remove();
+            hideNodeTooltip();
             const width = document.getElementById('graph-container').clientWidth;
             const height = document.getElementById('graph-container').clientHeight;
             
@@ -2084,6 +2278,12 @@ def generate_html(data: dict) -> str:
                         renderSidePanel();
                         updateSidebarNav();
                     }
+                })
+                .on('mouseover', (event, d) => {
+                    handleNodeMouseOver(event, d);
+                })
+                .on('mouseout', (event, d) => {
+                    handleNodeMouseOut(event, d);
                 });
             
             node.filter(d => d.type === 'folder')
@@ -2425,15 +2625,13 @@ def generate_html(data: dict) -> str:
                     gitStatusData.deleted = gitData.deleted || [];
                     gitStatusData.renamed = gitData.renamed || [];
                 }
-                if (!data) { updateChangesInFolderPanel(); renderGraph(); updateSelection(); return; }
+                if (!data) { updateChangesInFolderPanel(); return; }
                 const ts = data.lastSendTimestamp;
                 const changes = data.changes || [];
                 lastChangesData.changes = changes;
                 lastChangesData.lastSendTimestamp = ts;
                 lastEl.textContent = 'Last Cmd+S: ' + (ts == null ? 'Never' : new Date(ts).toISOString());
                 updateChangesInFolderPanel();
-                renderGraph();
-                updateSelection();
                 if (ts !== lastSeenSendTimestamp) {
                     lastSeenSendTimestamp = ts;
                     fetch(origin + '/api/rescan')
@@ -2468,8 +2666,6 @@ def generate_html(data: dict) -> str:
                 }
             }).catch(function() {
                 updateChangesInFolderPanel();
-                renderGraph();
-                updateSelection();
             });
         }
         loadRecentChanges();
