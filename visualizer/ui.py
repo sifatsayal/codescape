@@ -820,6 +820,12 @@ def generate_html(data: dict) -> str:
             pointer-events: none;
         }
         
+        .node text.node-label-outside {
+            font-size: 12px;
+            fill: #e7e7ee;
+            text-anchor: middle;
+        }
+        
         .node text.node-label-inside {
             font-size: 12px;
             fill: #e7e7ee;
@@ -865,6 +871,10 @@ def generate_html(data: dict) -> str:
             fill: #7c3aed;
         }
         
+        .container-circle {
+            pointer-events: none;
+        }
+        
         #legend {
             position: fixed;
             top: 70px;
@@ -899,6 +909,13 @@ def generate_html(data: dict) -> str:
             border-radius: 50%;
             flex-shrink: 0;
         }
+        .legend-arrow-icon {
+            width: 36px;
+            height: 14px;
+            flex-shrink: 0;
+        }
+        .legend-arrow-icon line { stroke-width: 2; }
+        .legend-arrow-icon path { stroke: none; }
         .legend-ext {
             font-family: 'JetBrains Mono', monospace;
             color: #e7e7ee;
@@ -1180,11 +1197,24 @@ def generate_html(data: dict) -> str:
     <div id="legend-file-types" class="legend-types"></div>
     <div class="legend-deps-compact">
       <div class="legend-type-row">
-        <div class="legend-swatch" style="background:#22c55e;"></div>
+        <svg class="legend-arrow-icon" viewBox="0 0 36 14" aria-hidden="true">
+          <line x1="0" y1="7" x2="24" y2="7" stroke="#06b6d4"/>
+          <path d="M24 2 L34 7 L24 12 Z" fill="#06b6d4"/>
+        </svg>
+        <span class="legend-ext">Import (A → B)</span>
+      </div>
+      <div class="legend-type-row">
+        <svg class="legend-arrow-icon" viewBox="0 0 36 14" aria-hidden="true">
+          <line x1="0" y1="7" x2="24" y2="7" stroke="#22c55e"/>
+          <path d="M24 2 L34 7 L24 12 Z" fill="#22c55e"/>
+        </svg>
         <span class="legend-ext">Inbound</span>
       </div>
       <div class="legend-type-row">
-        <div class="legend-swatch" style="background:#f59e0b;"></div>
+        <svg class="legend-arrow-icon" viewBox="0 0 36 14" aria-hidden="true">
+          <line x1="0" y1="7" x2="24" y2="7" stroke="#f59e0b"/>
+          <path d="M24 2 L34 7 L24 12 Z" fill="#f59e0b"/>
+        </svg>
         <span class="legend-ext">Outbound</span>
       </div>
       <div class="legend-type-row">
@@ -1200,6 +1230,15 @@ def generate_html(data: dict) -> str:
       <div class="legend-section-title">Dependencies</div>
       <div class="legend-caption-top">A → B means A depends on B. Arrows show when a file is selected.</div>
       <div class="legend-grid">
+        <div class="legend-icon">
+          <svg class="legend-arrow" viewBox="0 0 52 16">
+            <line x1="0" y1="8" x2="44" y2="8" stroke="#06b6d4" marker-end="url(#arrowhead)"></line>
+          </svg>
+        </div>
+        <div class="legend-label">
+          <div class="legend-name">Import (A → B)</div>
+          <div class="legend-caption">Dependency link between files</div>
+        </div>
         <div class="legend-icon">
           <svg class="legend-arrow" viewBox="0 0 52 16">
             <line x1="0" y1="8" x2="44" y2="8" stroke="#22c55e" marker-end="url(#arrowhead-inbound)"></line>
@@ -1422,9 +1461,13 @@ def generate_html(data: dict) -> str:
         }
         
         function getPackRadius(node) {
-            const base = getNodeSize(node);
-            const minR = node.type === 'folder' ? 60 : 28;
-            return Math.max(minR, base);
+            const fileR = Math.max(28, getNodeSize(node));
+            return node.type === 'folder' ? 2 * fileR : fileR;
+        }
+        
+        function getPackValue(node) {
+            // Pack uses area (value); use fixed ratio so folders are always 2x file radius
+            return node.type === 'folder' ? 4 : 1;
         }
         
         function normPath(p) {
@@ -1712,11 +1755,45 @@ def generate_html(data: dict) -> str:
                 return;
             }
             
-            // Pack layout: assign value (area) and run d3.pack
+            // Sort visibleNodes by connected components so linked nodes are placed next to each other
+            (function sortByConnectedComponents() {
+                const idToNode = new Map(visibleNodes.map(n => [n.id, n]));
+                const adj = new Map();
+                visibleNodes.forEach(n => adj.set(n.id, new Set()));
+                visibleLinks.forEach(l => {
+                    const srcId = typeof l.source === 'object' && l.source !== null ? l.source.id : l.source;
+                    const tgtId = typeof l.target === 'object' && l.target !== null ? l.target.id : l.target;
+                    if (idToNode.has(srcId) && idToNode.has(tgtId) && srcId !== tgtId) {
+                        adj.get(srcId).add(tgtId);
+                        adj.get(tgtId).add(srcId);
+                    }
+                });
+                const compId = new Map();
+                let compIndex = 0;
+                visibleNodes.forEach(n => {
+                    if (compId.has(n.id)) return;
+                    const stack = [n.id];
+                    compId.set(n.id, compIndex);
+                    while (stack.length) {
+                        const id = stack.pop();
+                        for (const nb of adj.get(id)) {
+                            if (!compId.has(nb)) {
+                                compId.set(nb, compIndex);
+                                stack.push(nb);
+                            }
+                        }
+                    }
+                    compIndex++;
+                });
+                visibleNodes.forEach(n => { n._comp = compId.has(n.id) ? compId.get(n.id) : compIndex; });
+                visibleNodes.sort((a, b) => (a._comp - b._comp) || ((a.id || '').localeCompare(b.id || '')));
+            })();
+            
+            // Pack layout: assign value (area) so folders are always 2x file radius
             simulation = null;
-            visibleNodes.forEach(n => { n.value = getPackRadius(n) * getPackRadius(n); });
+            visibleNodes.forEach(n => { n.value = getPackValue(n); });
             const root = { children: visibleNodes };
-            const hierarchy = d3.hierarchy(root).sum(d => d.value ?? 0);
+            const hierarchy = d3.hierarchy(root, d => (d === root ? d.children : null)).sum(d => d.value ?? 0);
             const PACK_PADDING = 12;
             d3.pack().size([width, height]).padding(PACK_PADDING)(hierarchy);
             hierarchy.children.forEach(c => {
@@ -1724,6 +1801,8 @@ def generate_html(data: dict) -> str:
                 c.data.y = c.y;
                 c.data.r = c.r;
             });
+            const containerCenterX = hierarchy.x;
+            const containerCenterY = hierarchy.y;
             
             // Resolve link source/target to node objects (with x, y, r)
             const nodeById = new Map(visibleNodes.map(n => [n.id, n]));
@@ -1735,33 +1814,16 @@ def generate_html(data: dict) -> str:
             });
             const resolvedLinks = visibleLinks.filter(l => l.source && l.target && l.source.x != null && l.target.x != null);
             
-            // Draw links (positions from pack; shortened at target)
-            const link = g.append('g')
-                .attr('class', 'links')
-                .selectAll('line')
-                .data(resolvedLinks)
-                .join('line')
-                .attr('class', d => `link ${d.type}`)
+            // Draw container circle (current folder: gray fill, black stroke)
+            g.append('circle')
+                .attr('class', 'container-circle')
+                .attr('cx', containerCenterX)
+                .attr('cy', containerCenterY)
+                .attr('r', hierarchy.r)
+                .attr('fill', '#374151')
+                .attr('stroke', '#111')
                 .attr('stroke-width', 2)
-                .attr('marker-end', 'url(#arrowhead)')
-                .attr('x1', d => d.source && d.source.x != null ? d.source.x : 0)
-                .attr('y1', d => d.source && d.source.y != null ? d.source.y : 0)
-                .attr('x2', d => {
-                    if (!d.target || d.target.x == null) return 0;
-                    const dx = d.target.x - (d.source?.x ?? 0);
-                    const dy = d.target.y - (d.source?.y ?? 0);
-                    const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-                    const targetR = (d.target.r != null ? d.target.r : getPackRadius(d.target)) + 5;
-                    return d.target.x - (dx/dist) * targetR;
-                })
-                .attr('y2', d => {
-                    if (!d.target || d.target.y == null) return 0;
-                    const dx = d.target.x - (d.source?.x ?? 0);
-                    const dy = d.target.y - (d.source?.y ?? 0);
-                    const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-                    const targetR = (d.target.r != null ? d.target.r : getPackRadius(d.target)) + 5;
-                    return d.target.y - (dy/dist) * targetR;
-                });
+                .lower();
             
             // Draw nodes (circle + folder label outside / file label inside)
             const node = g.append('g')
@@ -1800,7 +1862,7 @@ def generate_html(data: dict) -> str:
                 .attr('fill', d => d.type === 'folder' ? '#374151' : getNodeColor(d))
                 .attr('stroke', d => d.type === 'folder' ? '#111' : (d3.color(getNodeColor(d))?.darker(0.5) || '#333'));
             
-            // All nodes: label inside circle, centered, 12px, truncated to fit
+            // Folder and file labels: inside circle, 12px, truncated to fit
             node.each(function(d) {
                 const maxChars = Math.max(1, Math.floor((d.r * 1.6) / 7));
                 const label = d.name.length > maxChars ? d.name.slice(0, maxChars - 3) + '...' : d.name;
@@ -1810,6 +1872,34 @@ def generate_html(data: dict) -> str:
                     .attr('y', 0)
                     .text(label);
             });
+            
+            // Draw links on top so inbound/outbound arrows are visible over nodes
+            g.append('g')
+                .attr('class', 'links')
+                .selectAll('line')
+                .data(resolvedLinks)
+                .join('line')
+                .attr('class', d => `link ${d.type}`)
+                .attr('stroke-width', 2)
+                .attr('marker-end', 'url(#arrowhead)')
+                .attr('x1', d => d.source && d.source.x != null ? d.source.x : 0)
+                .attr('y1', d => d.source && d.source.y != null ? d.source.y : 0)
+                .attr('x2', d => {
+                    if (!d.target || d.target.x == null) return 0;
+                    const dx = d.target.x - (d.source?.x ?? 0);
+                    const dy = d.target.y - (d.source?.y ?? 0);
+                    const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+                    const targetR = (d.target.r != null ? d.target.r : getPackRadius(d.target)) + 5;
+                    return d.target.x - (dx/dist) * targetR;
+                })
+                .attr('y2', d => {
+                    if (!d.target || d.target.y == null) return 0;
+                    const dx = d.target.x - (d.source?.x ?? 0);
+                    const dy = d.target.y - (d.source?.y ?? 0);
+                    const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+                    const targetR = (d.target.r != null ? d.target.r : getPackRadius(d.target)) + 5;
+                    return d.target.y - (dy/dist) * targetR;
+                });
             
             updateSelection();
         }
