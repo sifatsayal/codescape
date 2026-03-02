@@ -880,8 +880,9 @@ def generate_html(data: dict) -> str:
             opacity: 0.92;
         }
         
-        .folder-preview-overlay circle {
+        .folder-preview-overlay .folder-preview-dot {
             stroke: none;
+            filter: none;
         }
         
         #legend {
@@ -1884,10 +1885,11 @@ def generate_html(data: dict) -> str:
                         const nd = c.data;
                         const fill = nd.type === 'folder' ? '#374151' : getNodeColor(nd);
                         overlay.append('circle')
+                            .attr('class', 'folder-preview-dot')
                             .attr('cx', c.x - center)
                             .attr('cy', c.y - center)
                             .attr('r', Math.max(c.r, 3))
-                            .attr('fill', fill)
+                            .style('fill', fill)
                             .attr('stroke', 'none');
                     });
                 })
