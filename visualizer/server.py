@@ -432,7 +432,7 @@ def get_local_ip():
         return None
 
 
-def find_available_port(start=8000, max_tries=20):
+def find_available_port(start=8000, max_tries=100):
     """Find an available port starting from start. Returns None if none found."""
     for i in range(max_tries):
         port = start + i

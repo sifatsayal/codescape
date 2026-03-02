@@ -191,7 +191,7 @@ Examples:
     else:
         port = find_available_port(8000)
         if port is None:
-            print("❌ Error: No available port found (tried 8000–8019). Stop other services using these ports.")
+            print("❌ Error: No available port found (tried 8000–8099). Try: python3 visualize_codebase.py --port 8080")
             return 1
         if port != 8000:
             print(f"   Port 8000 in use, using port {port} instead.")

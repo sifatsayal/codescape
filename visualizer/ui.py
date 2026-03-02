@@ -875,6 +875,15 @@ def generate_html(data: dict) -> str:
             pointer-events: none;
         }
         
+        .folder-preview-overlay {
+            pointer-events: none;
+            opacity: 0.92;
+        }
+        
+        .folder-preview-overlay circle {
+            stroke: none;
+        }
+        
         #legend {
             position: fixed;
             top: 70px;
@@ -1855,6 +1864,37 @@ def generate_html(data: dict) -> str:
                         renderSidePanel();
                         updateSidebarNav();
                     }
+                });
+            
+            node.filter(d => d.type === 'folder')
+                .on('mouseenter', function(event, d) {
+                    if (!d.children || d.children.length === 0) return;
+                    const children = d.children.map(id => nodesById.get(id)).filter(Boolean);
+                    if (children.length === 0) return;
+                    const size = Math.max(2 * d.r - 24, 24);
+                    const root = { children: children.map(n => ({ ...n, value: 1 })) };
+                    const hierarchy = d3.hierarchy(root, x => (x === root ? x.children : null)).sum(x => x.value ?? 0);
+                    d3.pack().size([size, size]).padding(2)(hierarchy);
+                    const center = size / 2;
+                    const clipId = 'folder-clip-' + String(d.id || 'root').replace(/[^a-z0-9-_]/gi, '_');
+                    const defs = d3.select('#graph').select('defs');
+                    defs.append('clipPath').attr('id', clipId).append('circle').attr('r', d.r).attr('cx', 0).attr('cy', 0);
+                    const overlay = d3.select(this).append('g').attr('class', 'folder-preview-overlay').attr('clip-path', 'url(#' + clipId + ')');
+                    hierarchy.children.forEach(c => {
+                        const nd = c.data;
+                        const fill = nd.type === 'folder' ? '#374151' : getNodeColor(nd);
+                        overlay.append('circle')
+                            .attr('cx', c.x - center)
+                            .attr('cy', c.y - center)
+                            .attr('r', Math.max(c.r, 3))
+                            .attr('fill', fill)
+                            .attr('stroke', 'none');
+                    });
+                })
+                .on('mouseleave', function(event, d) {
+                    d3.select(this).selectAll('.folder-preview-overlay').remove();
+                    const clipId = 'folder-clip-' + String(d.id || 'root').replace(/[^a-z0-9-_]/gi, '_');
+                    d3.select('#graph').select('defs').select('#' + clipId).remove();
                 });
             
             node.append('circle')
