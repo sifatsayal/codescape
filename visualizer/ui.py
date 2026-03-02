@@ -175,6 +175,110 @@ def generate_html(data: dict) -> str:
         .header-load-repo button.browse-btn:hover:not(:disabled) {
             background: rgba(6, 182, 212, 0.35);
         }
+        .header-search {
+            position: relative;
+            margin-left: 16px;
+            flex: 0 0 280px;
+        }
+        .header-search input {
+            width: 100%;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            padding: 6px 28px 6px 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(100, 100, 150, 0.3);
+            background: rgba(20, 20, 35, 0.9);
+            color: #e0e0e0;
+        }
+        .header-search input::placeholder {
+            color: #666;
+        }
+        .header-search input:focus {
+            outline: none;
+            border-color: #06b6d4;
+            box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.6);
+        }
+        .search-clear-btn {
+            position: absolute;
+            top: 50%;
+            right: 8px;
+            transform: translateY(-50%);
+            width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            border: none;
+            background: transparent;
+            color: #6b7280;
+            cursor: pointer;
+            font-size: 13px;
+            line-height: 1;
+            padding: 0;
+        }
+        .search-clear-btn:hover {
+            color: #e5e7eb;
+            background: rgba(55, 65, 81, 0.6);
+        }
+        .search-clear-btn:focus-visible {
+            outline: 2px solid #06b6d4;
+            outline-offset: 1px;
+        }
+        .search-results {
+            position: absolute;
+            top: 30px;
+            left: 0;
+            right: 0;
+            max-height: 260px;
+            overflow-y: auto;
+            margin-top: 6px;
+            padding: 6px 0;
+            background: rgba(12, 12, 22, 0.98);
+            border-radius: 8px;
+            border: 1px solid rgba(100, 100, 150, 0.4);
+            box-shadow: 0 14px 35px rgba(0, 0, 0, 0.6);
+            z-index: 120;
+            display: none;
+        }
+        .search-result-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .search-result-item:hover {
+            background: rgba(37, 99, 235, 0.35);
+        }
+        .search-result-icon {
+            font-size: 13px;
+            margin-top: 2px;
+        }
+        .search-result-text {
+            flex: 1;
+            min-width: 0;
+        }
+        .search-result-name {
+            color: #e5e7eb;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .search-result-path {
+            color: #9ca3af;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .search-result-meta {
+            margin-top: 2px;
+            color: #6b7280;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
         
         #graph-container {
             position: fixed;
@@ -1125,6 +1229,11 @@ def generate_html(data: dict) -> str:
             <button type="button" id="load-repo-browse-btn" class="browse-btn" title="Choose folder on your computer">Browse</button>
             <button type="button" id="load-repo-btn">Load repo</button>
         </div>
+        <div class="header-search">
+            <input type="text" id="search-input" placeholder="Search files and folders…" autocomplete="off" />
+            <button type="button" id="search-clear-btn" class="search-clear-btn" title="Clear search">×</button>
+            <div id="search-results" class="search-results"></div>
+        </div>
         <div class="breadcrumb" id="breadcrumb">
             <span class="breadcrumb-item" onclick="navigateTo('', true)">''' + data['rootName'] + '''</span>
         </div>
@@ -1637,6 +1746,7 @@ def generate_html(data: dict) -> str:
             if (clearPanel) selectedNode = null;
             pushHistory(path || '');
             currentPath = path;
+            clearSearchUI();
             updateBreadcrumb();
             renderGraph();
             updateSelection();
@@ -1654,6 +1764,7 @@ def generate_html(data: dict) -> str:
             if (path === '') {
                 currentPath = '';
                 selectedNode = null;
+                clearSearchUI();
                 updateBreadcrumb();
                 renderGraph();
                 updateSelection();
@@ -1672,6 +1783,7 @@ def generate_html(data: dict) -> str:
                 parts.pop();
                 currentPath = parts.join('/');
             }
+            clearSearchUI();
             updateBreadcrumb();
             renderGraph();
             updateSelection();
@@ -1713,6 +1825,111 @@ def generate_html(data: dict) -> str:
             updateSelection();
             renderSidePanel();
             updateSidebarNav();
+        }
+        function clearSearchUI() {
+            const input = document.getElementById('search-input');
+            const container = document.getElementById('search-results');
+            if (input) input.value = '';
+            if (container) {
+                container.style.display = 'none';
+                container.innerHTML = '';
+            }
+            clearSelection();
+        }
+        function normalizeSearchText(s) {
+            return String(s || '').toLowerCase();
+        }
+        function getSearchMatches(query, limit) {
+            const q = normalizeSearchText(query);
+            if (!q) return [];
+            const nodes = graphData.nodes || [];
+            const out = [];
+            const max = limit || 30;
+            for (const n of nodes) {
+                if (n.type !== 'file' && n.type !== 'folder') continue;
+                const name = normalizeSearchText(n.name);
+                const path = normalizeSearchText(n.path || n.id || '');
+                if (!name && !path) continue;
+                if (name.includes(q) || path.includes(q)) {
+                    out.push(n);
+                    if (out.length >= max) break;
+                }
+            }
+            return out;
+        }
+        function renderSearchResultsList(nodes, query) {
+            const container = document.getElementById('search-results');
+            if (!container) return;
+            container.innerHTML = '';
+            if (!query || nodes.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+            const esc = escapeAttr;
+            container.style.display = 'block';
+            container.innerHTML = nodes.map(n => {
+                const path = n.path || n.id || '';
+                const kind = n.type === 'folder' ? 'Folder' : 'File';
+                const icon = n.type === 'folder' ? '📁' : '📄';
+                return `<div class="search-result-item" data-node-id="${esc(n.id)}">
+                    <span class="search-result-icon">${icon}</span>
+                    <div class="search-result-text">
+                        <div class="search-result-name">${esc(n.name)}</div>
+                        <div class="search-result-path">${esc(path || '/')}</div>
+                        <div class="search-result-meta">${kind}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+        function handleSearchSelect(nodeId) {
+            if (!nodeId) return;
+            const node = nodesById.get(nodeId);
+            if (!node) return;
+            if (node.type === 'folder') {
+                navigateTo(node.path || node.id, true);
+                return;
+            }
+            const path = node.path || node.id;
+            if (!path) return;
+            focusFile(path);
+        }
+        function attachSearchHandlers() {
+            const input = document.getElementById('search-input');
+            const container = document.getElementById('search-results');
+            const clearBtn = document.getElementById('search-clear-btn');
+            if (!input || !container) return;
+            input.addEventListener('input', () => {
+                const query = input.value.trim();
+                if (!query) {
+                    clearSearchUI();
+                    return;
+                }
+                const matches = getSearchMatches(query, 30);
+                renderSearchResultsList(matches, query);
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    clearSearchUI();
+                }
+            });
+            if (clearBtn) {
+                clearBtn.addEventListener('click', () => {
+                    clearSearchUI();
+                    input.focus();
+                });
+            }
+            container.addEventListener('click', (e) => {
+                const item = e.target.closest('.search-result-item');
+                if (!item) return;
+                const nodeId = item.getAttribute('data-node-id');
+                handleSearchSelect(nodeId);
+                container.style.display = 'none';
+                input.blur();
+            });
+            document.addEventListener('click', (e) => {
+                if (e.target === input || container.contains(e.target)) return;
+                container.style.display = 'none';
+            });
         }
         
         function updateBreadcrumb() {
@@ -1852,15 +2069,17 @@ def generate_html(data: dict) -> str:
                 .attr('transform', d => `translate(${d.x},${d.y})`)
                 .on('click', (event, d) => {
                     event.stopPropagation();
-                    selectedNode = d;
                     if (d.type === 'folder') {
-                        navigateTo(d.path || d.id);
+                        navigateTo(d.path || d.id, true);
                     } else {
+                        clearSearchUI();
+                        selectedNode = d;
                         pushHistory(d.id || d.path);
                         const parts = (d.path || d.id).split('/');
                         parts.pop();
                         currentPath = parts.join('/');
                         updateBreadcrumb();
+                        renderGraph();
                         updateSelection();
                         renderSidePanel();
                         updateSidebarNav();
@@ -2173,6 +2392,7 @@ def generate_html(data: dict) -> str:
         const sidebarForwardBtn = document.getElementById('sidebar-forward-btn');
         if (sidebarBackBtn) sidebarBackBtn.addEventListener('click', goBack);
         if (sidebarForwardBtn) sidebarForwardBtn.addEventListener('click', goForward);
+        attachSearchHandlers();
 
         // Initial render
         renderGraph();
