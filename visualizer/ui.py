@@ -240,53 +240,57 @@ def generate_html(data: dict) -> str:
         }
         .node-tooltip {
             position: fixed;
-            max-width: 320px;
+            max-width: 280px;
             background: rgba(15, 15, 25, 0.97);
             color: #e5e7eb;
-            border-radius: 10px;
+            border-radius: 8px;
             border: 1px solid rgba(100, 100, 150, 0.5);
-            box-shadow: 0 18px 45px rgba(0, 0, 0, 0.75);
-            padding: 10px 12px;
-            font-size: 12px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+            padding: 8px 10px;
+            font-size: 11px;
             z-index: 160;
             pointer-events: auto;
+            line-height: 1.35;
         }
         .node-tooltip-header {
             font-weight: 600;
-            margin-bottom: 4px;
+            font-size: 12px;
+            margin-bottom: 2px;
             color: #e5e7eb;
         }
-        .node-tooltip-subtitle {
-            font-size: 11px;
+        .node-tooltip-type-path {
+            font-size: 10px;
             color: #9ca3af;
             margin-bottom: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            word-break: break-all;
         }
         .node-tooltip-meta-row {
             display: flex;
             justify-content: space-between;
-            gap: 12px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
+            gap: 10px;
+            font-size: 10px;
             color: #9ca3af;
         }
         .node-tooltip-meta-row + .node-tooltip-meta-row {
-            margin-top: 2px;
+            margin-top: 1px;
         }
         .node-tooltip-divider {
-            margin: 8px 0;
+            margin: 5px 0;
             height: 1px;
             background: rgba(55, 65, 81, 0.9);
         }
         .node-tooltip-summary {
-            font-size: 12px;
+            font-size: 11px;
             color: #d1d5db;
-            line-height: 1.4;
+            line-height: 1.3;
+            word-wrap: break-word;
         }
         .node-tooltip-summary-loading {
             display: flex;
             align-items: center;
-            gap: 6px;
-            font-size: 11px;
+            gap: 5px;
+            font-size: 10px;
             color: #9ca3af;
         }
         .node-tooltip-spinner {
@@ -1560,42 +1564,43 @@ def generate_html(data: dict) -> str:
             }
             return 'No summary available.';
         }
+        function firstSentence(s) {
+            if (typeof s !== 'string' || !s.trim()) return '';
+            const trimmed = s.trim();
+            const match = trimmed.match(/^[^.!?]+[.!?]?/);
+            return (match ? match[0] : trimmed).trim();
+        }
         function buildTooltipHTMLForNode(node, summaryState) {
             const isFile = node.type === 'file';
-            const name = escapeAttr(node.name || '');
-            const path = escapeAttr(node.path || node.id || '');
-            let header = name;
-            let subtitle = '';
+            const name = escapeAttr(node.name || 'Unknown');
+            const path = (node.path || node.id || '').trim();
+            const pathDisplay = path ? escapeAttr(path) : '—';
+            const typeLabel = isFile ? 'File' : 'Folder';
+            let html = `<div class="node-tooltip-header">${name}</div>`;
+            html += `<div class="node-tooltip-type-path">${typeLabel} · ${pathDisplay}</div>`;
             if (isFile) {
-                const lang = node.language || '';
-                subtitle = lang ? `${lang} • ${path}` : path;
-            } else {
-                subtitle = path || '(folder)';
-            }
-            let html = `<div class="node-tooltip-header">${header}</div>`;
-            if (subtitle) {
-                html += `<div class="node-tooltip-subtitle">${subtitle}</div>`;
-            }
-            if (isFile) {
-                const loc = node.loc != null ? node.loc.toLocaleString() : '0';
-                const inbound = Array.isArray(node.dependents) ? node.dependents.length : 0;
-                const outbound = Array.isArray(node.dependencies) ? node.dependencies.length : 0;
-                html += `<div class="node-tooltip-meta-row"><span>Lines of code</span><span>${loc}</span></div>`;
-                html += `<div class="node-tooltip-meta-row"><span>Inbound (imports this)</span><span>${inbound}</span></div>`;
-                html += `<div class="node-tooltip-meta-row"><span>Outbound (imports)</span><span>${outbound}</span></div>`;
+                const loc = node.loc != null ? node.loc.toLocaleString() : '—';
+                const inbound = Array.isArray(node.dependents) ? node.dependents.length : '—';
+                const outbound = Array.isArray(node.dependencies) ? node.dependencies.length : '—';
+                html += `<div class="node-tooltip-meta-row"><span>Lines</span><span>${loc}</span></div>`;
+                html += `<div class="node-tooltip-meta-row"><span>Inbound</span><span>${inbound}</span></div>`;
+                html += `<div class="node-tooltip-meta-row"><span>Outbound</span><span>${outbound}</span></div>`;
                 html += `<div class="node-tooltip-divider"></div>`;
                 const hasSummary = summaryState && typeof summaryState.summary === 'string' && summaryState.summary.trim() !== '';
-                if (hasSummary) {
-                    html += `<div id="node-tooltip-summary" class="node-tooltip-summary">${escapeAttr(summaryState.summary)}</div>`;
-                } else {
+                const oneLine = hasSummary ? firstSentence(summaryState.summary) : '';
+                if (hasSummary && oneLine) {
+                    html += `<div id="node-tooltip-summary" class="node-tooltip-summary" title="${escapeAttr(summaryState.summary)}">${escapeAttr(oneLine)}</div>`;
+                } else if (summaryState && summaryState.loading) {
                     html += `<div id="node-tooltip-summary" class="node-tooltip-summary node-tooltip-summary-loading">
                         <span class="node-tooltip-spinner"></span>
                         <span>Generating AI summary…</span>
                     </div>`;
+                } else {
+                    html += `<div id="node-tooltip-summary" class="node-tooltip-summary">—</div>`;
                 }
             } else {
-                const directFiles = node.directFileCount != null ? node.directFileCount : 0;
-                const subfolders = node.subfolderCount != null ? node.subfolderCount : 0;
+                const directFiles = node.directFileCount != null ? node.directFileCount : '—';
+                const subfolders = node.subfolderCount != null ? node.subfolderCount : '—';
                 html += `<div class="node-tooltip-meta-row"><span>Direct files</span><span>${directFiles}</span></div>`;
                 html += `<div class="node-tooltip-meta-row"><span>Subfolders</span><span>${subfolders}</span></div>`;
             }
@@ -1606,7 +1611,12 @@ def generate_html(data: dict) -> str:
             nodeTooltipNodeId = node.id;
             const isFile = node.type === 'file';
             const path = node.path || node.id || '';
-            const summaryState = isFile && path ? fileSummaryCache.get(path) : null;
+            let summaryState = isFile && path ? fileSummaryCache.get(path) : null;
+            const needFetch = isFile && path && (!summaryState || !summaryState.summary);
+            if (needFetch) {
+                fileSummaryCache.set(path, { summary: '', loading: true });
+                summaryState = fileSummaryCache.get(path);
+            }
             el.innerHTML = buildTooltipHTMLForNode(node, summaryState);
             const offset = 14;
             const x = (event.clientX || 0) + offset;
@@ -1614,21 +1624,19 @@ def generate_html(data: dict) -> str:
             el.style.left = x + 'px';
             el.style.top = y + 'px';
             el.style.display = 'block';
-            if (isFile && path) {
-                if (!summaryState || (!summaryState.summary && !summaryState.loading)) {
-                    fileSummaryCache.set(path, { summary: '', loading: true });
-                    (async () => {
-                        const summary = await fetchFileSummary(path);
-                        fileSummaryCache.set(path, { summary, loading: false });
-                        if (nodeTooltipNodeId === node.id && nodeTooltipEl) {
-                            const summaryEl = nodeTooltipEl.querySelector('#node-tooltip-summary');
-                            if (summaryEl) {
-                                summaryEl.classList.remove('node-tooltip-summary-loading');
-                                summaryEl.innerText = summary;
-                            }
+            if (needFetch) {
+                (async () => {
+                    const summary = await fetchFileSummary(path);
+                    fileSummaryCache.set(path, { summary, loading: false });
+                    if (nodeTooltipNodeId === node.id && nodeTooltipEl) {
+                        const summaryEl = nodeTooltipEl.querySelector('#node-tooltip-summary');
+                        if (summaryEl) {
+                            summaryEl.classList.remove('node-tooltip-summary-loading');
+                            summaryEl.innerText = firstSentence(summary) || '—';
+                            summaryEl.title = summary;
                         }
-                    })();
-                }
+                    }
+                })();
             }
         }
         function handleNodeMouseOver(event, node) {

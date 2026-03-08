@@ -182,9 +182,9 @@ def _summarize_file_with_ai(repo_path, relative_path):
         max_chars = 6000
         truncated = content[:max_chars] + ("..." if len(content) > max_chars else "")
         prompt = (
-            "In exactly 1-2 sentences, describe what this file does. "
-            "Be direct and technical. No filler phrases like 'this file serves as' "
-            "or 'this document provides'. Just state what it does.\n\n"
+            "In exactly one short sentence (plain English), state what this file does. "
+            "Be direct and technical. No filler phrases like 'this file serves as' or 'this document provides'. "
+            "One sentence only.\n\n"
             f"File path: {path}\n\n"
             f"File contents:\n{truncated}"
         )
