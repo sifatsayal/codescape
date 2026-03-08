@@ -762,6 +762,71 @@ def generate_html(data: dict) -> str:
             font-weight: 500;
         }
         
+        .ai-summary-section {
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(100, 100, 150, 0.2);
+        }
+        .ai-summary-section .sidebar-title {
+            margin-bottom: 10px;
+        }
+        .ai-summary-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+        .ai-summary-tab {
+            padding: 6px 10px;
+            font-size: 11px;
+            border: none;
+            border-radius: 6px;
+            background: rgba(100, 100, 150, 0.2);
+            color: #9ca3af;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+        .ai-summary-tab:hover {
+            background: rgba(124, 58, 237, 0.25);
+            color: #e0e0e0;
+        }
+        .ai-summary-tab.active {
+            background: #7c3aed;
+            color: #fff;
+        }
+        .ai-summary-content {
+            min-height: 60px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #d1d5db;
+            background: rgba(20, 20, 35, 0.5);
+            border-radius: 8px;
+            padding: 12px;
+            border: 1px solid rgba(100, 100, 150, 0.2);
+        }
+        .ai-summary-loading {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #9ca3af;
+        }
+        .ai-summary-loading::before {
+            content: '';
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(124, 58, 237, 0.4);
+            border-top-color: #7c3aed;
+            border-radius: 50%;
+            animation: ai-summary-spin 0.8s linear infinite;
+        }
+        @keyframes ai-summary-spin {
+            to { transform: rotate(360deg); }
+        }
+        .ai-summary-text {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        
         .dep-item {
             font-size: 12px;
             font-family: 'JetBrains Mono', monospace;
@@ -1493,6 +1558,7 @@ def generate_html(data: dict) -> str:
         const EXTENSION_FALLBACK = '#64748b';
         let extensionColorMap = {};  // extension -> hex, computed from graphData.nodes
         const fileSummaryCache = new Map();  // path -> { summary: string, loading: boolean }
+        const aiSummaryCache = {};  // path::mode -> { result: string } or { loading: true }
         let nodeTooltipEl = null;
         let nodeTooltipTimer = null;
         let nodeTooltipNodeId = null;
@@ -2564,6 +2630,17 @@ def generate_html(data: dict) -> str:
                             </div>
                         ` : ''}
                     </div>
+                    <div class="ai-summary-section" data-file-path="${esc(node.path || '')}" data-inbound="${esc((dependents || []).join('|'))}" data-outbound="${esc((dependencies || []).join('|'))}">
+                        <div class="sidebar-title">AI Summary</div>
+                        <div class="ai-summary-tabs">
+                            <button type="button" class="ai-summary-tab" data-mode="overview">Overview</button>
+                            <button type="button" class="ai-summary-tab" data-mode="how_it_works">How it works</button>
+                            <button type="button" class="ai-summary-tab" data-mode="impact">Impact</button>
+                            <button type="button" class="ai-summary-tab" data-mode="edit_safely">Edit safely</button>
+                            <button type="button" class="ai-summary-tab" data-mode="read_next">Read next</button>
+                        </div>
+                        <div class="ai-summary-content">Click a tab to generate</div>
+                    </div>
                 </div>
             `;
         }
@@ -2600,6 +2677,52 @@ def generate_html(data: dict) -> str:
         const sidebarForwardBtn = document.getElementById('sidebar-forward-btn');
         if (sidebarBackBtn) sidebarBackBtn.addEventListener('click', goBack);
         if (sidebarForwardBtn) sidebarForwardBtn.addEventListener('click', goForward);
+        const detailsPanel = document.getElementById('details-panel');
+        if (detailsPanel) {
+            detailsPanel.addEventListener('click', async function(e) {
+                if (!e.target || !e.target.classList.contains('ai-summary-tab')) return;
+                const tab = e.target;
+                const section = tab.closest('.ai-summary-section');
+                if (!section) return;
+                const path = section.getAttribute('data-file-path') || '';
+                const inbound = section.getAttribute('data-inbound') || '';
+                const outbound = section.getAttribute('data-outbound') || '';
+                const mode = tab.getAttribute('data-mode') || '';
+                const cacheKey = path + '::' + mode;
+                const contentEl = section.querySelector('.ai-summary-content');
+                if (!contentEl) return;
+                section.querySelectorAll('.ai-summary-tab').forEach(function(t) { t.classList.remove('active'); });
+                tab.classList.add('active');
+                function escapeHtml(s) {
+                    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                }
+                if (aiSummaryCache[cacheKey]) {
+                    if (aiSummaryCache[cacheKey].loading) {
+                        contentEl.innerHTML = '<div class="ai-summary-loading">Generating…</div>';
+                        return;
+                    }
+                    contentEl.innerHTML = '<div class="ai-summary-text">' + escapeHtml(aiSummaryCache[cacheKey].result) + '</div>';
+                    return;
+                }
+                aiSummaryCache[cacheKey] = { loading: true };
+                contentEl.innerHTML = '<div class="ai-summary-loading">Generating…</div>';
+                const params = new URLSearchParams();
+                params.set('path', path);
+                params.set('mode', mode);
+                params.set('inbound', inbound);
+                params.set('outbound', outbound);
+                try {
+                    const resp = await fetch(window.location.origin + '/api/ai_file_mode?' + params.toString());
+                    const data = await resp.json();
+                    const result = (data && data.result) ? data.result : 'No summary available.';
+                    aiSummaryCache[cacheKey] = { result: result };
+                    contentEl.innerHTML = '<div class="ai-summary-text">' + escapeHtml(result) + '</div>';
+                } catch (err) {
+                    aiSummaryCache[cacheKey] = { result: 'Failed to load.' };
+                    contentEl.innerHTML = '<div class="ai-summary-text">Failed to load.</div>';
+                }
+            });
+        }
         attachSearchHandlers();
 
         // Initial render

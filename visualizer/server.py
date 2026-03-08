@@ -212,6 +212,81 @@ def _summarize_file_with_ai(repo_path, relative_path):
         return None
 
 
+# Mode-specific prompts for /api/ai_file_mode (sidebar AI summary).
+_AI_FILE_MODE_PROMPTS = {
+    "overview": "In 2 sentences max, what does this file do? Be direct. No filler.",
+    "how_it_works": "List 3-4 bullet points explaining how this file works internally. Each bullet max 10 words. No intros or conclusions.",
+    "impact": "List the files that import this one and what breaks if it changes. Be specific. If no dependents, say so in one line.",
+    "edit_safely": "List 3-5 specific things to watch out for before editing this file. Bullet points only. Max 8 words each.",
+    "read_next": "List 3 files to read next with one line each explaining why. Format: filename — reason",
+}
+
+
+def _ai_file_mode(repo_path, relative_path, mode, inbound_paths, outbound_paths):
+    """Return AI-generated text for the given file and mode. Uses gpt-4o-mini."""
+    path = (relative_path or "").replace("\\", "/").strip()
+    if not path or mode not in _AI_FILE_MODE_PROMPTS:
+        return None
+    repo = Path(repo_path).resolve()
+    full_path = (repo / path).resolve()
+    try:
+        if not full_path.is_file():
+            return None
+        with open(full_path, encoding="utf-8", errors="ignore") as f:
+            content = f.read()
+    except Exception:
+        return None
+    if not content:
+        return None
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        return None
+    prompt_template = _AI_FILE_MODE_PROMPTS[mode]
+    inbound_str = ", ".join(inbound_paths[:50]) if inbound_paths else "(none)"
+    outbound_str = ", ".join(outbound_paths[:50]) if outbound_paths else "(none)"
+    max_chars = 12000
+    truncated = content[:max_chars] + ("..." if len(content) > max_chars else "")
+    prompt = (
+        f"{prompt_template}\n\n"
+        f"File path: {path}\n\n"
+        f"Inbound dependencies (files that import this file): {inbound_str}\n"
+        f"Outbound dependencies (files this file imports): {outbound_str}\n\n"
+    )
+    if mode in ("impact", "edit_safely", "read_next"):
+        inbound_list = "\n".join(f"  - {p}" for p in inbound_paths[:50]) if inbound_paths else "  (none)"
+        outbound_list = "\n".join(f"  - {p}" for p in outbound_paths[:50]) if outbound_paths else "  (none)"
+        prompt += (
+            f"Actual inbound files (use these names in your response):\n{inbound_list}\n\n"
+            f"Actual outbound files (use these names in your response):\n{outbound_list}\n\n"
+        )
+    prompt += f"File contents:\n{truncated}"
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            "https://api.openai.com/v1/chat/completions",
+            data=json.dumps(
+                {
+                    "model": "gpt-4o-mini",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 1024,
+                }
+            ).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + api_key,
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            choices = result.get("choices", [])
+            if choices and choices[0].get("message", {}).get("content"):
+                return choices[0]["message"]["content"].strip()
+    except Exception:
+        return None
+    return None
+
+
 def _describe_change_rule_based(change):
     """Return a short human-readable description of a change event (rule-based, no LLM)."""
     if not change or not isinstance(change, dict):
@@ -366,6 +441,33 @@ def create_handler(html_content, load_repo_callback=None, initial_repo_path=None
                 if not summary:
                     summary = 'No summary available.'
                 self._send_json(200, {'summary': summary})
+                return
+            if parsed.path == '/api/ai_file_mode':
+                query = parse_qs(parsed.query)
+                path_list = query.get('path')
+                path = (path_list[0] if path_list else '').strip().replace('\\', '/')
+                mode_list = query.get('mode')
+                mode = (mode_list[0] if mode_list else '').strip().lower()
+                inbound_raw = (query.get('inbound') or [None])[0] or ''
+                outbound_raw = (query.get('outbound') or [None])[0] or ''
+                def split_paths(s):
+                    return [p.strip() for p in str(s).replace(',', '|').split('|') if p.strip()]
+                inbound_paths = split_paths(inbound_raw)
+                outbound_paths = split_paths(outbound_raw)
+                if not path or not mode:
+                    self._send_json(400, {'error': 'Missing path or mode parameter'})
+                    return
+                if mode not in _AI_FILE_MODE_PROMPTS:
+                    self._send_json(400, {'error': 'Invalid mode'})
+                    return
+                repo = current_repo_path or initial_repo_path
+                if not repo:
+                    self._send_json(400, {'error': 'No repo path (start visualizer with --repo)'})
+                    return
+                result_text = _ai_file_mode(repo, path, mode, inbound_paths, outbound_paths)
+                if not result_text:
+                    result_text = 'No summary available.'
+                self._send_json(200, {'result': result_text})
                 return
             if parsed.path == '/api/rescan':
                 # Same as initial load: full scan (files, folders, imports) for the repo we started with
