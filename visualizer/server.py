@@ -9,6 +9,8 @@ import socket
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from visualizer.guide import generate_tour_steps
+
 
 def _load_dotenv(file_path):
     """Load KEY=value lines from file_path into os.environ (no external deps)."""
@@ -595,6 +597,30 @@ def create_handler(html_content, load_repo_callback=None, initial_repo_path=None
                     return
                 description = _describe_file_change_with_ai(repo, path, status)
                 self._send_json(200, {'description': description})
+                return
+            if parsed.path == '/api/generate_tour':
+                nonlocal current_repo_path
+                content_length = int(self.headers.get('Content-Length', 0) or 0)
+                if content_length <= 0:
+                    self._send_json(400, {'error': 'Missing body'})
+                    return
+                try:
+                    body = self.rfile.read(content_length).decode('utf-8')
+                    data = json.loads(body) if body.strip() else {}
+                    nodes = data.get('nodes', data.get('graphData', {}).get('nodes', []))
+                    links = data.get('links', data.get('graphData', {}).get('links', []))
+                except (json.JSONDecodeError, ValueError) as e:
+                    self._send_json(400, {'error': 'Invalid JSON: ' + str(e)})
+                    return
+                repo = current_repo_path or initial_repo_path
+                if not repo:
+                    self._send_json(400, {'error': 'No repo path (start visualizer with --repo)'})
+                    return
+                try:
+                    steps = generate_tour_steps(repo, {'nodes': nodes, 'links': links})
+                    self._send_json(200, steps)
+                except Exception as e:
+                    self._send_json(500, {'error': str(e)})
                 return
             self.send_response(404)
             self.end_headers()

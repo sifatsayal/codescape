@@ -222,6 +222,26 @@ def generate_html(data: dict) -> str:
             outline: 2px solid #06b6d4;
             outline-offset: 1px;
         }
+        .header-tour-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #a78bfa;
+            background: transparent;
+            border: 1px solid rgba(124, 58, 237, 0.5);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+            box-shadow: 0 0 12px rgba(124, 58, 237, 0.25);
+        }
+        .header-tour-btn:hover {
+            background: rgba(124, 58, 237, 0.2);
+            color: #e0e0e0;
+            box-shadow: 0 0 16px rgba(124, 58, 237, 0.4);
+        }
         .search-results {
             position: absolute;
             top: 30px;
@@ -1335,7 +1355,146 @@ def generate_html(data: dict) -> str:
             margin: 0 4px;
             font-family: 'JetBrains Mono', monospace;
         }
-        
+        #tour-overlay {
+            position: fixed;
+            left: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 50;
+        }
+        #tour-overlay.active {
+            pointer-events: auto;
+        }
+        #tour-overlay-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.35);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        #tour-overlay.active #tour-overlay-backdrop {
+            opacity: 1;
+        }
+        #tour-panel {
+            position: fixed;
+            left: 24px;
+            bottom: 72px;
+            width: 360px;
+            max-width: calc(100vw - 48px);
+            background: rgba(15, 15, 25, 0.97);
+            border: 1px solid rgba(100, 100, 150, 0.25);
+            border-radius: 16px;
+            padding: 20px 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            transform: translateY(120%);
+            opacity: 0;
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+            z-index: 51;
+        }
+        #tour-overlay.active #tour-panel {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        .tour-step-progress {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #9ca3af;
+            margin-bottom: 8px;
+        }
+        .tour-step-title {
+            font-size: 20px;
+            font-weight: 600;
+            background: linear-gradient(90deg, #06b6d4, #7c3aed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 12px;
+            transition: opacity 0.2s ease;
+        }
+        .tour-step-body {
+            font-size: 14px;
+            line-height: 1.55;
+            color: #d1d5db;
+            margin-bottom: 20px;
+        }
+        .tour-progress-dots {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .tour-progress-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(100, 100, 150, 0.4);
+            transition: background 0.25s ease, transform 0.25s ease;
+        }
+        .tour-progress-dot.active {
+            background: #7c3aed;
+            transform: scale(1.2);
+        }
+        .tour-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .tour-actions button {
+            padding: 10px 18px;
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s, opacity 0.2s;
+        }
+        .tour-actions .tour-btn-back {
+            background: rgba(100, 100, 150, 0.25);
+            color: #e0e0e0;
+        }
+        .tour-actions .tour-btn-back:hover:not(:disabled) {
+            background: rgba(124, 58, 237, 0.3);
+        }
+        .tour-actions .tour-btn-back:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+        .tour-actions .tour-btn-next {
+            background: #7c3aed;
+            color: #fff;
+        }
+        .tour-actions .tour-btn-next:hover:not(:disabled) {
+            background: #8b5cf6;
+        }
+        .tour-actions .tour-btn-next:disabled {
+            opacity: 0.5;
+            cursor: default;
+        }
+        .tour-actions .tour-btn-exit {
+            margin-left: auto;
+            background: transparent;
+            color: #9ca3af;
+            border: 1px solid rgba(100, 100, 150, 0.3);
+        }
+        .tour-actions .tour-btn-exit:hover {
+            color: #e0e0e0;
+            border-color: rgba(124, 58, 237, 0.5);
+        }
+        .node.tour-dimmed {
+            opacity: 0.2;
+        }
+        .node .tour-glow-ring {
+            fill: none;
+            stroke: #06b6d4;
+            stroke-width: 3;
+            animation: tour-glow-pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes tour-glow-pulse {
+            0%, 100% { opacity: 1; stroke-width: 3; }
+            50% { opacity: 0.6; stroke-width: 5; }
+        }
         .placeholder {
             color: #888;
             font-style: italic;
@@ -1365,6 +1524,7 @@ def generate_html(data: dict) -> str:
             <button type="button" id="search-clear-btn" class="search-clear-btn" title="Clear search">×</button>
             <div id="search-results" class="search-results"></div>
         </div>
+        <button type="button" id="tour-start-btn" class="header-tour-btn" title="Start Virtual Guide">✦ Start Virtual Guide</button>
         <div class="breadcrumb" id="breadcrumb">
             <span class="breadcrumb-item" onclick="navigateTo('', true)">''' + data['rootName'] + '''</span>
         </div>
@@ -1431,6 +1591,21 @@ def generate_html(data: dict) -> str:
                 <div id="recent-changes-git-list" class="recent-changes-list"></div>
             </div>
             <div class="recent-changes-tip">Open via Cursor: <strong>Codebase Visualizer: Visualize Codebase</strong> for live updates on save.</div>
+        </div>
+    </div>
+    
+    <div id="tour-overlay">
+        <div id="tour-overlay-backdrop"></div>
+        <div id="tour-panel">
+            <div class="tour-step-progress" id="tour-step-progress">Step 1 of 5</div>
+            <h2 class="tour-step-title" id="tour-step-title">Main Entry Point</h2>
+            <p class="tour-step-body" id="tour-step-body">Placeholder explanation for this step. The Virtual Guide will highlight key nodes and explain the codebase structure.</p>
+            <div class="tour-progress-dots" id="tour-progress-dots"></div>
+            <div class="tour-actions">
+                <button type="button" class="tour-btn-back" id="tour-btn-back" disabled>Back</button>
+                <button type="button" class="tour-btn-next" id="tour-btn-next">Next</button>
+                <button type="button" class="tour-btn-exit" id="tour-btn-exit">Exit</button>
+            </div>
         </div>
     </div>
     
@@ -1559,6 +1734,9 @@ def generate_html(data: dict) -> str:
         let extensionColorMap = {};  // extension -> hex, computed from graphData.nodes
         const fileSummaryCache = new Map();  // path -> { summary: string, loading: boolean }
         const aiSummaryCache = {};  // path::mode -> { result: string } or { loading: true }
+        window._tourActive = false;
+        window._tourStepIndex = 0;
+        window._tourSteps = [];
         let nodeTooltipEl = null;
         let nodeTooltipTimer = null;
         let nodeTooltipNodeId = null;
@@ -1823,6 +2001,11 @@ def generate_html(data: dict) -> str:
             });
             
         svg.call(zoom);
+        window._graphG = g;
+        window._graphSvg = svg;
+        window._graphZoom = zoom;
+        window._graphWidth = width;
+        window._graphHeight = height;
         
         // Click on background to deselect
         svg.on('click', () => {
@@ -2437,6 +2620,161 @@ def generate_html(data: dict) -> str:
                 });
             
             updateSelection();
+            applyTourDimmingAndHighlight();
+        }
+        
+        function getParentFolderPath(nodeId) {
+            if (!nodeId) return '';
+            const parts = String(nodeId).replace(/\\\\/g, '/').split('/').filter(Boolean);
+            parts.pop();
+            return parts.join('/');
+        }
+        
+        function applyTourDimmingAndHighlight() {
+            const gRef = window._graphG;
+            if (!gRef) return;
+            if (!window._tourActive || !window._tourSteps || !window._tourSteps.length) {
+                gRef.selectAll('.node').attr('opacity', 1).classed('tour-dimmed', false);
+                gRef.selectAll('.tour-glow-ring').remove();
+                return;
+            }
+            const targetId = window._tourSteps[window._tourStepIndex].nodeId;
+            gRef.selectAll('.node').attr('opacity', d => d.id === targetId ? 1 : 0.2).classed('tour-dimmed', d => d.id !== targetId);
+            gRef.selectAll('.node').each(function(d) {
+                const el = d3.select(this);
+                if (d.id === targetId) {
+                    if (el.select('.tour-glow-ring').empty()) {
+                        el.insert('circle', ':first-child').attr('class', 'tour-glow-ring').attr('r', (d.r || 20) + 8).attr('fill', 'none').attr('stroke', '#06b6d4').attr('stroke-width', 3);
+                    }
+                } else {
+                    el.select('.tour-glow-ring').remove();
+                }
+            });
+        }
+        
+        function zoomToTourNode() {
+            const g = window._graphG;
+            const svg = window._graphSvg;
+            const zoom = window._graphZoom;
+            if (!g || !svg || !zoom || !window._tourSteps || !window._tourSteps.length) return;
+            const targetId = window._tourSteps[window._tourStepIndex].nodeId;
+            const nodeEl = g.selectAll('.node').filter(d => d.id === targetId);
+            const d = nodeEl.datum();
+            if (!d) return;
+            const width = window._graphWidth || document.getElementById('graph-container').clientWidth;
+            const height = window._graphHeight || document.getElementById('graph-container').clientHeight;
+            const k = 1.5;
+            const t = d3.zoomIdentity.translate(width / 2 - d.x * k, height / 2 - d.y * k).scale(k);
+            svg.transition().duration(600).ease(d3.easeCubicInOut).call(zoom.transform, t);
+        }
+        
+        function updateTourUI() {
+            const progressEl = document.getElementById('tour-step-progress');
+            const titleEl = document.getElementById('tour-step-title');
+            const bodyEl = document.getElementById('tour-step-body');
+            const dotsEl = document.getElementById('tour-progress-dots');
+            const backBtn = document.getElementById('tour-btn-back');
+            const nextBtn = document.getElementById('tour-btn-next');
+            if (!progressEl || !titleEl || !bodyEl || !dotsEl || !backBtn || !nextBtn) return;
+            const steps = window._tourSteps;
+            const idx = window._tourStepIndex;
+            const n = steps.length;
+            progressEl.textContent = 'Step ' + (idx + 1) + ' of ' + n;
+            titleEl.textContent = steps[idx].title;
+            bodyEl.textContent = steps[idx].body || 'Placeholder explanation for this step.';
+            dotsEl.innerHTML = '';
+            for (let i = 0; i < n; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'tour-progress-dot' + (i === idx ? ' active' : '');
+                dotsEl.appendChild(dot);
+            }
+            backBtn.disabled = idx === 0;
+            nextBtn.disabled = idx === n - 1;
+        }
+        
+        function getFallbackTourSteps() {
+            const fileNodes = graphData.nodes.filter(n => n.type === 'file');
+            const stepTitles = ['Entry Point', 'Core Logic', 'UI Layer', 'Config', 'Where to Start'];
+            return fileNodes.slice(0, 5).map((n, i) => ({
+                title: stepTitles[i] || 'Step ' + (i + 1),
+                body: 'Placeholder explanation for this step.',
+                nodeId: n.id
+            }));
+        }
+        
+        function startTourWithSteps(apiSteps) {
+            if (Array.isArray(apiSteps) && apiSteps.length > 0) {
+                window._tourSteps = apiSteps.map(s => ({
+                    nodeId: (s.nodeId || '').replace(/\\\\/g, '/'),
+                    title: s.title || 'Step',
+                    body: s.explanation || s.body || 'Key file in the codebase.'
+                }));
+            } else {
+                window._tourSteps = getFallbackTourSteps();
+            }
+            if (!window._tourSteps.length) return;
+            window._tourActive = true;
+            window._tourStepIndex = 0;
+            const parentPath = getParentFolderPath(window._tourSteps[0].nodeId);
+            navigateTo(parentPath || '', true);
+            document.getElementById('tour-overlay').classList.add('active');
+            updateTourUI();
+            setTimeout(zoomToTourNode, 50);
+        }
+        
+        function startTour() {
+            const btn = document.getElementById('tour-start-btn');
+            if (!btn) return;
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Generating guide…';
+            fetch(window.location.origin + '/api/generate_tour', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nodes: graphData.nodes, links: graphData.links || [] })
+            })
+                .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('Failed to generate tour')); })
+                .then(function(steps) {
+                    startTourWithSteps(steps);
+                })
+                .catch(function() {
+                    startTourWithSteps(null);
+                })
+                .finally(function() {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                });
+        }
+        
+        function exitTour() {
+            window._tourActive = false;
+            document.getElementById('tour-overlay').classList.remove('active');
+            navigateTo('', true);
+            setTimeout(function() {
+                const svg = window._graphSvg;
+                const zoom = window._graphZoom;
+                if (svg && zoom) {
+                    svg.transition().duration(400).ease(d3.easeCubicInOut).call(zoom.transform, d3.zoomIdentity);
+                }
+            }, 0);
+        }
+        
+        function tourNext() {
+            if (window._tourStepIndex >= window._tourSteps.length - 1) return;
+            window._tourStepIndex++;
+            updateTourUI();
+            const parentPath = getParentFolderPath(window._tourSteps[window._tourStepIndex].nodeId);
+            navigateTo(parentPath || '', true);
+            setTimeout(zoomToTourNode, 0);
+        }
+        
+        function tourBack() {
+            if (window._tourStepIndex <= 0) return;
+            window._tourStepIndex--;
+            updateTourUI();
+            const parentPath = getParentFolderPath(window._tourSteps[window._tourStepIndex].nodeId);
+            navigateTo(parentPath || '', true);
+            setTimeout(zoomToTourNode, 0);
         }
         
         function updateSelection() {
@@ -2723,6 +3061,19 @@ def generate_html(data: dict) -> str:
                 }
             });
         }
+        const tourStartBtn = document.getElementById('tour-start-btn');
+        if (tourStartBtn) tourStartBtn.addEventListener('click', startTour);
+        const tourBackBtn = document.getElementById('tour-btn-back');
+        if (tourBackBtn) tourBackBtn.addEventListener('click', tourBack);
+        const tourNextBtn = document.getElementById('tour-btn-next');
+        if (tourNextBtn) tourNextBtn.addEventListener('click', tourNext);
+        const tourExitBtn = document.getElementById('tour-btn-exit');
+        if (tourExitBtn) tourExitBtn.addEventListener('click', exitTour);
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && window._tourActive) {
+                exitTour();
+            }
+        });
         attachSearchHandlers();
 
         // Initial render
