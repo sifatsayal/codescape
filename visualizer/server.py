@@ -289,6 +289,85 @@ def _ai_file_mode(repo_path, relative_path, mode, inbound_paths, outbound_paths)
     return None
 
 
+def _guide_goal_recommend(repo_path, goal, node_ids):
+    """Return 3 file recommendations for the given goal based on tour node contents. Uses gpt-4o-mini."""
+    repo = Path(repo_path).resolve()
+    file_contents = []
+    for nid in (node_ids or [])[:10]:
+        rel = (nid or "").replace("\\", "/").strip()
+        if not rel:
+            continue
+        full = (repo / rel).resolve()
+        try:
+            if full.is_file():
+                with open(full, encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+            else:
+                content = ""
+        except Exception:
+            content = ""
+        truncated = content[:4000] + ("..." if len(content) > 4000 else "")
+        file_contents.append({"nodeId": rel, "content": truncated})
+    if not file_contents:
+        return []
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        return []
+    goal_lower = (goal or "").strip().lower()
+    if goal_lower == "fix a bug":
+        prompt = (
+            "A developer wants to fix a bug but doesn't know where it is yet. Based on these key files, "
+            "recommend the 3 files most likely to contain bugs or be fragile — files with high complexity, "
+            "many dependencies, or tricky logic. Return ONLY a valid JSON array of 3 objects with: "
+            "nodeId (file path, must be an existing path in this repo), reason (max 10 words, why this file is worth checking). No filler.\n\n"
+        )
+    else:
+        prompt = (
+            f"A developer wants to {goal} in this codebase. Based on these key files, "
+            "recommend exactly 3 files to start with. Return ONLY a valid JSON array of 3 objects with: "
+            "nodeId (file path, must be an existing path in this repo), reason (max 10 words, direct and specific). No filler.\n\n"
+        )
+    for fc in file_contents:
+        prompt += f"--- File: {fc['nodeId']} ---\n{fc['content']}\n\n"
+    prompt += "Return ONLY the JSON array, no markdown or extra text."
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            "https://api.openai.com/v1/chat/completions",
+            data=json.dumps({
+                "model": "gpt-4o-mini",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 400,
+            }).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + api_key,
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            choices = result.get("choices", [])
+            if not choices or not choices[0].get("message", {}).get("content"):
+                return []
+            raw = choices[0]["message"]["content"].strip()
+            raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+            arr = json.loads(raw)
+            if not isinstance(arr, list) or len(arr) < 3:
+                return []
+            out = []
+            for i, obj in enumerate(arr[:3]):
+                if not isinstance(obj, dict):
+                    continue
+                nid = (obj.get("nodeId") or "").replace("\\", "/").strip()
+                reason = str(obj.get("reason") or "")[:80]
+                if nid:
+                    out.append({"nodeId": nid, "reason": reason})
+            return out[:3]
+    except Exception:
+        return []
+
+
 def _describe_change_rule_based(change):
     """Return a short human-readable description of a change event (rule-based, no LLM)."""
     if not change or not isinstance(change, dict):
@@ -516,6 +595,7 @@ def create_handler(html_content, load_repo_callback=None, initial_repo_path=None
 
         def do_POST(self):
             nonlocal last_send_timestamp
+            nonlocal current_repo_path
             parsed = urlparse(self.path)
             if parsed.path == '/api/rescan':
                 if not initial_repo_path or load_repo_callback is None:
@@ -599,7 +679,6 @@ def create_handler(html_content, load_repo_callback=None, initial_repo_path=None
                 self._send_json(200, {'description': description})
                 return
             if parsed.path == '/api/generate_tour':
-                nonlocal current_repo_path
                 content_length = int(self.headers.get('Content-Length', 0) or 0)
                 if content_length <= 0:
                     self._send_json(400, {'error': 'Missing body'})
@@ -619,6 +698,32 @@ def create_handler(html_content, load_repo_callback=None, initial_repo_path=None
                 try:
                     steps = generate_tour_steps(repo, {'nodes': nodes, 'links': links})
                     self._send_json(200, steps)
+                except Exception as e:
+                    self._send_json(500, {'error': str(e)})
+                return
+            if parsed.path == '/api/guide_goal':
+                content_length = int(self.headers.get('Content-Length', 0) or 0)
+                if content_length <= 0:
+                    self._send_json(400, {'error': 'Missing body'})
+                    return
+                try:
+                    body = self.rfile.read(content_length).decode('utf-8')
+                    data = json.loads(body) if body.strip() else {}
+                    goal = (data.get('goal') or '').strip()
+                    node_ids = data.get('nodeIds') or data.get('node_ids') or []
+                except (json.JSONDecodeError, ValueError) as e:
+                    self._send_json(400, {'error': 'Invalid JSON: ' + str(e)})
+                    return
+                if not goal:
+                    self._send_json(400, {'error': 'Missing goal'})
+                    return
+                repo = current_repo_path or initial_repo_path
+                if not repo:
+                    self._send_json(400, {'error': 'No repo path'})
+                    return
+                try:
+                    recs = _guide_goal_recommend(repo, goal, node_ids)
+                    self._send_json(200, recs)
                 except Exception as e:
                     self._send_json(500, {'error': str(e)})
                 return
