@@ -359,8 +359,69 @@ def generate_html(data: dict) -> str:
             bottom: 0;
             background: rgba(15, 15, 25, 0.98);
             border-left: 1px solid rgba(100, 100, 150, 0.2);
-            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
             padding: 16px;
+        }
+        .sidebar-body {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            margin: 0 -16px;
+        }
+        .sidebar-section-wrap {
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        .sidebar-details-wrap {
+            flex: 0 0 45%;
+            min-height: 120px;
+            padding: 0 16px;
+            border-bottom: 1px solid rgba(100, 100, 150, 0.15);
+        }
+        .sidebar-changes-wrap {
+            flex: 1 1 0;
+            min-height: 160px;
+            padding: 0 16px;
+        }
+        .sidebar-section-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #6b7280;
+            margin-bottom: 8px;
+            padding-top: 12px;
+            flex-shrink: 0;
+            border-bottom: 1px solid rgba(100, 100, 150, 0.12);
+            padding-bottom: 8px;
+        }
+        .sidebar-details-wrap .sidebar-section-label { padding-top: 0; }
+        .sidebar-resizer {
+            flex-shrink: 0;
+            height: 10px;
+            cursor: row-resize;
+            background: rgba(100, 100, 150, 0.15);
+            position: relative;
+        }
+        .sidebar-resizer:hover {
+            background: rgba(124, 58, 237, 0.35);
+        }
+        .sidebar-resizer::after {
+            content: '';
+            position: absolute;
+            left: 20%;
+            right: 20%;
+            top: 4px;
+            height: 2px;
+            background: rgba(150, 150, 180, 0.4);
+            border-radius: 1px;
+        }
+        .sidebar-resizer:hover::after {
+            background: rgba(167, 139, 250, 0.7);
         }
         .sidebar-nav {
             display: flex;
@@ -428,9 +489,7 @@ def generate_html(data: dict) -> str:
             color: #fca5a5;
         }
         .recent-changes-panel {
-            margin-top: 24px;
-            padding-top: 16px;
-            border-top: 1px solid rgba(100, 100, 150, 0.2);
+            margin-top: 8px;
         }
         .recent-changes-title {
             font-size: 11px;
@@ -445,75 +504,121 @@ def generate_html(data: dict) -> str:
             font-family: 'JetBrains Mono', monospace;
             line-height: 1.5;
         }
-        .recent-changes-muted {
-            margin-bottom: 10px;
-        }
-        .recent-changes-list {
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        .recent-changes-list .change-line {
-            margin-bottom: 4px;
-            word-break: break-all;
-        }
-        .recent-changes-git-section {
-            margin-top: 16px;
-            padding-top: 12px;
-            border-top: 1px solid rgba(100, 100, 150, 0.2);
-        }
-        .recent-changes-git-section .recent-changes-title {
-            margin-bottom: 6px;
-        }
+        .recent-changes-muted { margin-bottom: 10px; }
+        .recent-changes-list { max-height: 200px; overflow-y: auto; }
+        .recent-changes-list .change-line { margin-bottom: 4px; word-break: break-all; }
         .recent-changes-tip {
             margin-top: 12px;
             font-size: 10px;
             color: #6b7280;
             line-height: 1.35;
         }
-        .recent-changes-tip strong {
+        .recent-changes-tip strong { color: #9ca3af; }
+        .all-changes-last-updated {
+            font-size: 12px;
             color: #9ca3af;
+            margin-bottom: 10px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            background: rgba(30, 30, 45, 0.5);
+            transition: background 0.2s;
         }
-        .git-status-line {
+        .all-changes-last-updated.recent {
+            background: rgba(234, 179, 8, 0.2);
+            color: #facc15;
+        }
+        .all-changes-list {
+            max-height: 280px;
+            overflow-y: auto;
             font-size: 12px;
             font-family: 'JetBrains Mono', monospace;
-            margin-bottom: 4px;
-            word-break: break-all;
+            line-height: 1.45;
+        }
+        .all-changes-event {
+            margin-bottom: 6px;
+            border-radius: 6px;
+            background: rgba(30, 30, 45, 0.4);
+            overflow: hidden;
+        }
+        .all-changes-event-head {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 6px;
-        }
-        .git-status-badge {
-            flex-shrink: 0;
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 4px;
-        }
-        .git-status-badge.modified { background: rgba(245, 158, 11, 0.25); color: #fbbf24; }
-        .git-status-badge.added { background: rgba(34, 197, 94, 0.25); color: #4ade80; }
-        .git-status-badge.deleted { background: rgba(239, 68, 68, 0.25); color: #f87171; }
-        .git-status-badge.renamed { background: rgba(59, 130, 246, 0.25); color: #60a5fa; }
-        .git-status-ai-btn {
-            font-size: 10px;
-            padding: 3px 8px;
-            border: 1px solid rgba(59, 130, 246, 0.5);
-            background: rgba(59, 130, 246, 0.2);
-            color: #60a5fa;
-            border-radius: 4px;
+            padding: 8px 10px;
             cursor: pointer;
-            margin-left: 6px;
-            flex-shrink: 0;
+            color: #e5e7eb;
+            word-break: break-all;
         }
-        .git-status-ai-btn:hover { background: rgba(59, 130, 246, 0.35); }
-        .git-status-ai-summary {
+        .all-changes-event-head:hover { background: rgba(60, 60, 80, 0.4); }
+        .all-changes-event-sparkle {
+            flex-shrink: 0;
+            margin-top: 1px;
+            color: #a78bfa;
+        }
+        .all-changes-event-summary { flex: 1; min-width: 0; }
+        .all-changes-event-toggle {
+            flex-shrink: 0;
+            color: #9ca3af;
+            transition: transform 0.2s;
+        }
+        .all-changes-event.expanded .all-changes-event-toggle { transform: rotate(90deg); }
+        .all-changes-event-detail {
+            display: none;
+            padding: 10px 12px;
             font-size: 11px;
             color: #9ca3af;
-            margin-top: 6px;
-            padding: 8px;
             background: rgba(20, 20, 35, 0.6);
-            border-radius: 6px;
-            border-left: 2px solid #60a5fa;
+            border-top: 1px solid rgba(100, 100, 150, 0.15);
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 180px;
+            overflow-y: auto;
         }
-        .git-status-line-wrap { margin-bottom: 10px; }
+        .all-changes-event.expanded .all-changes-event-detail { display: block; }
+        .all-changes-diff-pre {
+            margin: 0 0 10px 0;
+            font-size: 10px;
+            line-height: 1.4;
+            overflow-x: auto;
+            white-space: pre;
+        }
+        .all-changes-detail-ai-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #9ca3af;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(100, 100, 150, 0.2);
+        }
+        .all-changes-detail-summary {
+            margin-top: 4px;
+            padding-top: 0;
+            border-top: none;
+        }
+        .all-changes-detail-ai-label + .all-changes-detail-summary {
+            margin-top: 4px;
+        }
+        .all-changes-semantic-list {
+            margin: 4px 0 0 0;
+            padding-left: 18px;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .all-changes-semantic-list li {
+            margin-bottom: 2px;
+        }
+        .all-changes-event.source-human {
+            border-left: 3px solid rgba(34, 197, 94, 0.8);
+        }
+        .all-changes-event.source-cursor {
+            border-left: 3px solid rgba(59, 130, 246, 0.8);
+        }
+        .all-changes-empty {
+            color: #6b7280;
+            font-size: 12px;
+            padding: 8px 0;
+        }
         .change-line-with-desc {
             margin-bottom: 10px;
         }
@@ -1350,18 +1455,22 @@ def generate_html(data: dict) -> str:
             <button type="button" id="sidebar-back-btn" class="sidebar-nav-btn" title="Back" aria-label="Back" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
             <button type="button" id="sidebar-forward-btn" class="sidebar-nav-btn" title="Forward" aria-label="Forward" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
         </div>
-        <div id="details-panel">
-            <div class="details-placeholder">Click a node to view its details</div>
-        </div>
-        <div id="recent-changes-panel" class="recent-changes-panel">
-            <div id="recent-changes-title" class="recent-changes-title">Changes in this folder</div>
-            <div id="recent-changes-last-send" class="recent-changes-muted">Last Cmd+S: —</div>
-            <div id="recent-changes-list" class="recent-changes-list"></div>
-            <div id="recent-changes-git-section" class="recent-changes-git-section">
-                <div id="recent-changes-git-title" class="recent-changes-title">Git working tree</div>
-                <div id="recent-changes-git-list" class="recent-changes-list"></div>
+        <div id="sidebar-body" class="sidebar-body">
+            <div id="sidebar-details-wrap" class="sidebar-section-wrap sidebar-details-wrap">
+                <div class="sidebar-section-label">Selection</div>
+                <div id="details-panel">
+                    <div class="details-placeholder">Click a node to view its details</div>
+                </div>
             </div>
-            <div class="recent-changes-tip">Open via Cursor: <strong>Codebase Visualizer: Visualize Codebase</strong> for live updates on save.</div>
+            <div id="sidebar-resizer" class="sidebar-resizer" title="Drag to resize"></div>
+            <div id="sidebar-changes-wrap" class="sidebar-section-wrap sidebar-changes-wrap">
+                <div class="sidebar-section-label">All changes</div>
+                <div id="recent-changes-panel" class="recent-changes-panel all-changes-panel">
+                    <div id="all-changes-last-updated" class="all-changes-last-updated">Last updated: —</div>
+                    <div id="all-changes-list" class="all-changes-list"></div>
+                    <div class="recent-changes-tip">Open: <strong>Codebase Visualizer: Visualize Codebase</strong>. Green = your changes (Cmd+S). Blue = Cursor (run <strong>Cursor applied changes</strong> after AI edits).</div>
+                </div>
+            </div>
         </div>
     </div>
     
@@ -1478,7 +1587,7 @@ def generate_html(data: dict) -> str:
         let selectionHistory = [];
         let historyIndex = -1;
         let lastChangesData = { lastSendTimestamp: null, changes: [] };
-        let gitStatusData = { modified: [], added: [], deleted: [], renamed: [] };
+        let changeContextData = { lastSendTimestamp: null, events: [], touchedPaths: [], fileContexts: [] };
 
         const FOLDER_COLOR = '#7c3aed';
         const EXTENSION_PALETTE = [
@@ -1800,13 +1909,7 @@ def generate_html(data: dict) -> str:
             return set;
         }
         function getMergedChangedPathSet() {
-            const set = getChangedPathSet(lastChangesData.changes);
-            const g = gitStatusData;
-            (g.modified || []).forEach(p => set.add(normPath(p)));
-            (g.added || []).forEach(p => set.add(normPath(p)));
-            (g.deleted || []).forEach(p => set.add(normPath(p)));
-            (g.renamed || []).forEach(r => { set.add(normPath(r.oldPath)); set.add(normPath(r.newPath)); });
-            return set;
+            return getChangedPathSet(lastChangesData.changes);
         }
         function getFolderHasChangedChildSet(nodes) {
             const changedPaths = getMergedChangedPathSet();
@@ -1836,105 +1939,155 @@ def generate_html(data: dict) -> str:
             if (!folderPath) return true;
             return norm === folderPath || norm.startsWith(folderPath + '/');
         }
-        let filteredChangesForPanel = [];
-        function updateChangesInFolderPanel() {
-            const titleEl = document.getElementById('recent-changes-title');
-            const listEl = document.getElementById('recent-changes-list');
-            const gitTitleEl = document.getElementById('recent-changes-git-title');
-            const gitListEl = document.getElementById('recent-changes-git-list');
-            if (!titleEl || !listEl) return;
-            const folderPath = currentPath || '';
-            if (titleEl) titleEl.textContent = folderPath ? 'Changes in this folder' : 'Changes in repo';
-            const changes = lastChangesData.changes || [];
-            filteredChangesForPanel = changes.filter(c => isChangeInFolder(c, folderPath));
-            if (filteredChangesForPanel.length === 0) {
-                listEl.innerHTML = '';
-            } else {
-                listEl.innerHTML = filteredChangesForPanel.map(function(c, i) {
-                    const lineText = formatChangeLine(c).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    return '<div class="change-line-with-desc" data-index="' + i + '">' +
-                        '<div class="change-line-text">' + lineText + '</div>' +
-                        '<button type="button" class="change-describe-btn" onclick="describeChange(this)">Describe</button>' +
-                        '<div class="change-description" style="display:none;"></div></div>';
-                }).join('');
+        function getPrimaryPathForEvent(ev) {
+            if (ev.path) return normPath(ev.path);
+            if (ev.newPath) return normPath(ev.newPath);
+            if (ev.fromFile) return normPath(ev.fromFile);
+            return null;
+        }
+        function eventKey(ev) {
+            return (ev.type || '') + '|' + (ev.path || '') + '|' + (ev.oldPath || '') + '|' + (ev.newPath || '') + '|' + (ev.fromFile || '') + '|' + (ev.timestamp || 0);
+        }
+        var expandedChangeKeys = new Set();
+        var GENERIC_SUMMARIES = ['file modified.', 'new file added.', 'file deleted.', 'file renamed or moved.', 'file modified (no diff available).'];
+        function isSubstantiveSummary(s) {
+            if (!s || typeof s !== 'string') return false;
+            const t = s.trim().toLowerCase();
+            if (t.length < 20) return false;
+            return GENERIC_SUMMARIES.every(function(g) { return t !== g && !t.startsWith(g); });
+        }
+        function escapeHtml(s) {
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+        function pathBasename(p) {
+            var s = (p || '').replace(/\\\\/g, '/');
+            var i = s.lastIndexOf('/');
+            return i >= 0 ? s.slice(i + 1) : s;
+        }
+        function getSemanticLine(ev) {
+            if (ev.type === 'file_added') return 'Added: ' + (ev.path || '');
+            if (ev.type === 'file_deleted') return 'Deleted: ' + (ev.path || '');
+            if (ev.type === 'file_body_edited') return 'Edited: ' + (ev.path || '');
+            if (ev.type === 'path_changed') return (ev.kind === 'renamed' ? 'Renamed: ' : 'Moved: ') + (ev.newPath || '');
+            if (ev.type === 'folder_added') return 'Folder added: ' + (ev.path || '');
+            if (ev.type === 'folder_deleted') return 'Folder deleted: ' + (ev.path || '');
+            if (ev.type === 'folder_path_changed') return (ev.kind === 'renamed' ? 'Renamed: ' : 'Moved: ') + (ev.newPath || '');
+            if (ev.type === 'import_added') return 'Import added in ' + (ev.fromFile || '');
+            if (ev.type === 'import_removed') return 'Import removed in ' + (ev.fromFile || '');
+            return (ev.type || 'Change') + ': ' + (ev.path || ev.oldPath || ev.newPath || '');
+        }
+        var SPARKLE_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/><path d="M19 12l.75 2.25L22 15l-2.25.75L19 18l-.75-2.25L16 15l2.25-.75L19 12z"/><path d="M5 19l.75 2.25L8 22l-2.25-.75L5 19l-.75-2.25L2 16l2.25-.75L5 19z"/></svg>';
+        function updateAllChangesPanel() {
+            const lastEl = document.getElementById('all-changes-last-updated');
+            const listEl = document.getElementById('all-changes-list');
+            if (!lastEl || !listEl) return;
+            const ts = changeContextData.lastSendTimestamp;
+            const events = changeContextData.events || [];
+            const pathToContext = {};
+            function pathKey(p) {
+                var n = normPath(p || '');
+                return n.replace(/\/+$/, '');
             }
-            if (gitTitleEl && gitListEl) {
-                const g = gitStatusData;
-                const mod = (g.modified || []).filter(p => isPathInFolder(p, folderPath));
-                const add = (g.added || []).filter(p => isPathInFolder(p, folderPath));
-                const del_ = (g.deleted || []).filter(p => isPathInFolder(p, folderPath));
-                const ren = (g.renamed || []).filter(r => isPathInFolder(r.oldPath, folderPath) || isPathInFolder(r.newPath, folderPath));
-                const total = mod.length + add.length + del_.length + ren.length;
-                gitTitleEl.textContent = folderPath ? 'Git working tree (this folder)' : 'Git working tree';
-                if (total === 0) {
-                    gitListEl.innerHTML = '<div class="recent-changes-muted">No uncommitted changes</div>';
+            (changeContextData.fileContexts || []).forEach(function(fc) {
+                if (fc && fc.path) {
+                    var k = pathKey(fc.path);
+                    pathToContext[k] = fc;
+                }
+            });
+            if (ts == null) {
+                lastEl.textContent = 'Last updated: —';
+                lastEl.classList.remove('recent');
+            } else {
+                const now = Date.now();
+                const mins = Math.floor((now - ts) / 60000);
+                if (mins < 1) {
+                    lastEl.textContent = 'Last updated: <1 min ago';
+                    lastEl.classList.add('recent');
                 } else {
-                    let html = '';
-                    function gitLine(path, status, label) {
-                        return '<div class="git-status-line-wrap"><div class="git-status-line">' +
-                            '<span class="git-status-badge ' + status + '">' + (status === 'modified' ? 'M' : status === 'added' ? 'A' : status === 'deleted' ? 'D' : 'R') + '</span>' +
-                            '<span>' + escapeAttr(label || path) + '</span>' +
-                            '<button type="button" class="git-status-ai-btn" onclick="describeFileChange(this)" data-path="' + escapeAttr(path) + '" data-status="' + (status === 'modified' ? 'M' : status === 'added' ? 'A' : status === 'deleted' ? 'D' : 'R') + '">AI Summarize</button></div>' +
-                            '<div class="git-status-ai-summary" style="display:none;"></div></div>';
-                    }
-                    mod.forEach(p => { html += gitLine(p, 'modified', p); });
-                    add.forEach(p => { html += gitLine(p, 'added', p); });
-                    del_.forEach(p => { html += gitLine(p, 'deleted', p); });
-                    ren.forEach(r => { html += gitLine(r.newPath, 'renamed', r.oldPath + ' → ' + r.newPath); });
-                    gitListEl.innerHTML = html;
+                    lastEl.textContent = 'Last updated: ' + mins + ' min ago';
+                    lastEl.classList.remove('recent');
                 }
             }
-        }
-        
-        async function describeChange(btn) {
-            const row = btn.closest('.change-line-with-desc');
-            if (!row) return;
-            const idx = parseInt(row.getAttribute('data-index'), 10);
-            if (isNaN(idx) || idx < 0 || idx >= filteredChangesForPanel.length) return;
-            const change = filteredChangesForPanel[idx];
-            const descEl = row.querySelector('.change-description');
-            if (!descEl) return;
-            btn.disabled = true;
-            descEl.style.display = 'block';
-            descEl.textContent = 'Loading…';
-            try {
-                const resp = await fetch(window.location.origin + '/api/describe_change', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ change: change })
-                });
-                const data = await resp.json();
-                descEl.textContent = data.description || (data.error ? 'Error: ' + data.error : 'No description.');
-            } catch (e) {
-                descEl.textContent = 'Error: ' + e.message;
+            if (events.length === 0) {
+                listEl.innerHTML = '<div class="all-changes-empty">No changes from last save.</div>';
+                return;
             }
-            btn.disabled = false;
-        }
-        
-        async function describeFileChange(btn) {
-            const path = btn.getAttribute('data-path');
-            const status = btn.getAttribute('data-status') || 'M';
-            if (!path) return;
-            const wrap = btn.closest('.git-status-line-wrap');
-            const summaryEl = wrap ? wrap.querySelector('.git-status-ai-summary') : null;
-            if (!summaryEl) return;
-            summaryEl.style.display = 'block';
-            summaryEl.textContent = 'Loading…';
-            btn.disabled = true;
-            try {
-                const resp = await fetch(window.location.origin + '/api/describe_file_change', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ path: path, status: status })
+            var ORIGINAL_TYPES = ['file_added', 'file_deleted', 'path_changed', 'folder_added', 'folder_deleted', 'folder_path_changed'];
+            var displayRows = [];
+            var editedPathToSource = {};
+            events.forEach(function(ev) {
+                if (ORIGINAL_TYPES.indexOf(ev.type) >= 0) {
+                    displayRows.push({ kind: 'original', ev: ev });
+                } else if (ev.type === 'file_body_edited' && ev.path) {
+                    var p = pathKey(ev.path);
+                    if (!editedPathToSource[p]) editedPathToSource[p] = ev.source || 'human';
+                }
+            });
+            Object.keys(editedPathToSource).forEach(function(p) {
+                displayRows.push({ kind: 'file_changed', path: p, source: editedPathToSource[p] });
+            });
+            listEl.innerHTML = displayRows.map(function(row, i) {
+                var key, lineText, sourceClass, detailContent;
+                if (row.kind === 'original') {
+                    var ev = row.ev;
+                    key = eventKey(ev);
+                    lineText = getSemanticLine(ev);
+                    sourceClass = (ev.source === 'cursor') ? 'source-cursor' : 'source-human';
+                    var primaryPath = getPrimaryPathForEvent(ev);
+                    var ctx = primaryPath ? (pathToContext[primaryPath] || pathToContext[pathKey(primaryPath)]) : null;
+                    var diff = ctx && ctx.diff ? ctx.diff : null;
+                    var summary = ctx && ctx.summary ? ctx.summary : null;
+                    var detailParts = [];
+                    if (ev.type === 'path_changed' || ev.type === 'folder_path_changed') {
+                        var oldP = ev.oldPath || '';
+                        var newP = ev.newPath || '';
+                        if (ev.kind === 'renamed') {
+                            detailParts.push('<div class="all-changes-detail-summary">Changed from ' + escapeHtml(pathBasename(oldP)) + ' to ' + escapeHtml(pathBasename(newP)) + '</div>');
+                        } else {
+                            detailParts.push('<div class="all-changes-detail-summary">Moved from ' + escapeHtml(oldP) + ' to ' + escapeHtml(newP) + '</div>');
+                        }
+                    }
+                    if (summary && summary.trim()) detailParts.push('<div class="all-changes-detail-summary">' + escapeHtml(summary) + '</div>');
+                    detailContent = detailParts.length ? detailParts.join('') : '';
+                } else {
+                    key = 'file_changed|' + row.path;
+                    lineText = 'File changed: ' + row.path;
+                    sourceClass = (row.source === 'cursor') ? 'source-cursor' : 'source-human';
+                    var fc = pathToContext[row.path];
+                    var detailParts = [];
+                    if (fc && fc.semanticChanges && fc.semanticChanges.length > 0) {
+                        detailParts.push('<ul class="all-changes-semantic-list">');
+                        fc.semanticChanges.forEach(function(s) {
+                            detailParts.push('<li>' + escapeHtml(s) + '</li>');
+                        });
+                        detailParts.push('</ul>');
+                    }
+                    detailContent = detailParts.length ? detailParts.join('') : '';
+                }
+                var isExpanded = expandedChangeKeys.has(key);
+                return '<div class="all-changes-event ' + sourceClass + (isExpanded ? ' expanded' : '') + '" data-index="' + i + '" data-event-key="' + escapeAttr(key) + '">' +
+                    '<div class="all-changes-event-head">' +
+                    '<span class="all-changes-event-summary">' + escapeAttr(lineText) + '</span>' +
+                    '<span class="all-changes-event-toggle">▶</span>' +
+                    '</div>' +
+                    '<div class="all-changes-event-detail">' + detailContent + '</div>' +
+                    '</div>';
+            }).join('');
+            listEl.querySelectorAll('.all-changes-event-head').forEach(function(head) {
+                head.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const row = head.closest('.all-changes-event');
+                    if (!row) return;
+                    const key = row.getAttribute('data-event-key');
+                    if (key) {
+                        if (expandedChangeKeys.has(key)) expandedChangeKeys.delete(key);
+                        else expandedChangeKeys.add(key);
+                    }
+                    row.classList.toggle('expanded');
                 });
-                const data = await resp.json();
-                summaryEl.textContent = data.description || (data.error ? 'Error: ' + data.error : 'No summary.');
-            } catch (e) {
-                summaryEl.textContent = 'Error: ' + e.message;
-            }
-            btn.disabled = false;
+            });
         }
-        
         function navigateTo(path, clearPanel) {
             if (clearPanel) selectedNode = null;
             pushHistory(path || '');
@@ -2564,14 +2717,14 @@ def generate_html(data: dict) -> str:
             const panel = document.getElementById('details-panel');
             if (selectedNode) {
                 panel.innerHTML = getCardHTML(selectedNode);
-                updateChangesInFolderPanel();
+                updateAllChangesPanel();
                 return;
             }
             if (currentPath) {
                 const folderNode = nodesById.get(currentPath);
                 if (folderNode) {
                     panel.innerHTML = getCardHTML(folderNode);
-                    updateChangesInFolderPanel();
+                    updateAllChangesPanel();
                     return;
                 }
             }
@@ -2585,19 +2738,65 @@ def generate_html(data: dict) -> str:
                     <div class="stat"><span>Lines of code</span><span class="stat-value">${loc}</span></div>
                 </div>
             `;
-            updateChangesInFolderPanel();
+            updateAllChangesPanel();
         }
         
         const sidebarBackBtn = document.getElementById('sidebar-back-btn');
         const sidebarForwardBtn = document.getElementById('sidebar-forward-btn');
         if (sidebarBackBtn) sidebarBackBtn.addEventListener('click', goBack);
         if (sidebarForwardBtn) sidebarForwardBtn.addEventListener('click', goForward);
+
+        (function initSidebarResizer() {
+            var SIDEBAR_RATIO_KEY = 'codebaseVisualizer.sidebarDetailsRatio';
+            var MIN_RATIO = 0.15;
+            var MAX_RATIO = 0.85;
+            var bodyEl = document.getElementById('sidebar-body');
+            var detailsWrap = document.getElementById('sidebar-details-wrap');
+            var resizer = document.getElementById('sidebar-resizer');
+            if (!bodyEl || !detailsWrap || !resizer) return;
+            var currentRatio = 0.45;
+            try {
+                var saved = localStorage.getItem(SIDEBAR_RATIO_KEY);
+                if (saved != null) {
+                    var r = parseFloat(saved);
+                    if (!isNaN(r) && r >= MIN_RATIO && r <= MAX_RATIO) currentRatio = r;
+                }
+            } catch (e) {}
+            function setRatio(r) {
+                currentRatio = Math.max(MIN_RATIO, Math.min(MAX_RATIO, r));
+                detailsWrap.style.flex = '0 0 ' + (currentRatio * 100) + '%';
+            }
+            setRatio(currentRatio);
+            resizer.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                var startY = e.clientY;
+                var bodyRect = bodyEl.getBoundingClientRect();
+                var startTopPx = currentRatio * bodyRect.height;
+                function onMove(moveE) {
+                    var dy = moveE.clientY - startY;
+                    var bodyH = bodyEl.getBoundingClientRect().height;
+                    setRatio((startTopPx + dy) / bodyH);
+                }
+                function onUp() {
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                    try { localStorage.setItem(SIDEBAR_RATIO_KEY, String(currentRatio)); } catch (e2) {}
+                }
+                document.body.style.cursor = 'row-resize';
+                document.body.style.userSelect = 'none';
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        })();
+
         attachSearchHandlers();
 
         // Initial render
         renderGraph();
         updateSidebarNav();
-        updateChangesInFolderPanel();
+        updateAllChangesPanel();
 
         // Recent changes — poll and update graph/panel
         function formatChangeLine(c) {
@@ -2609,29 +2808,29 @@ def generate_html(data: dict) -> str:
         }
         var lastSeenSendTimestamp = null;
         function loadRecentChanges() {
-            const lastEl = document.getElementById('recent-changes-last-send');
-            const listEl = document.getElementById('recent-changes-list');
-            if (!lastEl || !listEl) return;
+            const listEl = document.getElementById('all-changes-list');
+            if (!listEl) return;
             const origin = window.location.origin;
-            Promise.all([
-                fetch(origin + '/api/last_changes').then(function(r) { return r.ok ? r.json() : null; }),
-                fetch(origin + '/api/git_status').then(function(r) { return r.ok ? r.json() : null; })
-            ]).then(function(results) {
-                const data = results[0];
-                const gitData = results[1];
-                if (gitData) {
-                    gitStatusData.modified = gitData.modified || [];
-                    gitStatusData.added = gitData.added || [];
-                    gitStatusData.deleted = gitData.deleted || [];
-                    gitStatusData.renamed = gitData.renamed || [];
+            fetch(origin + '/api/change_context').then(function(r) { return r.ok ? r.json() : null; }).then(function(data) {
+                if (!data) {
+                    changeContextData.lastSendTimestamp = null;
+                    changeContextData.events = [];
+                    changeContextData.touchedPaths = [];
+                    changeContextData.fileContexts = [];
+                    lastChangesData.changes = [];
+                    lastChangesData.lastSendTimestamp = null;
+                    updateAllChangesPanel();
+                    return;
                 }
-                if (!data) { updateChangesInFolderPanel(); return; }
                 const ts = data.lastSendTimestamp;
-                const changes = data.changes || [];
-                lastChangesData.changes = changes;
+                const events = data.events || [];
+                changeContextData.lastSendTimestamp = ts;
+                changeContextData.events = events;
+                changeContextData.touchedPaths = data.touchedPaths || [];
+                changeContextData.fileContexts = data.fileContexts || [];
+                lastChangesData.changes = events;
                 lastChangesData.lastSendTimestamp = ts;
-                lastEl.textContent = 'Last Cmd+S: ' + (ts == null ? 'Never' : new Date(ts).toISOString());
-                updateChangesInFolderPanel();
+                updateAllChangesPanel();
                 if (ts !== lastSeenSendTimestamp) {
                     lastSeenSendTimestamp = ts;
                     fetch(origin + '/api/rescan')
@@ -2665,7 +2864,7 @@ def generate_html(data: dict) -> str:
                             .catch(function() {});
                 }
             }).catch(function() {
-                updateChangesInFolderPanel();
+                updateAllChangesPanel();
             });
         }
         loadRecentChanges();
