@@ -181,24 +181,28 @@ def _openai_one_line_summary(prompt_text, api_key, max_chars=2000):
     return None
 
 
-def _openai_semantic_changes_from_diff(diff_text, api_key, max_chars=4000):
-    """Ask OpenAI to break a diff into a list of semantic change descriptions (one short phrase per change). Returns list of strings."""
+def _openai_semantic_changes_from_diff(diff_text, api_key, max_chars=1200):
+    """Ask OpenAI to describe only the most recent change in the diff. Returns a list of one string for the panel."""
     if not api_key or not diff_text:
         return []
     try:
         import urllib.request
-        truncated = diff_text[:max_chars] + ("..." if len(diff_text) > max_chars else "")
+        # Send only the end of the diff so the model sees just the latest edit (e.g. "Removed a pair").
+        if len(diff_text) > max_chars:
+            truncated = "..." + diff_text[-max_chars:]
+        else:
+            truncated = diff_text
         prompt = (
-            "The following is a unified diff of code changes. List each distinct semantic change in one short phrase "
-            "(e.g. 'Added input validation', 'Fixed off-by-one in loop'). Put one phrase per line, no numbering. "
-            "Focus on what changed from a developer's perspective.\n\n" + truncated
+            "The following is the end of a unified diff (only the most recent edit). "
+            "Describe this single most recent change in one short phrase (e.g. 'Removed a pair', 'Added dark mode'). "
+            "Reply with exactly one phrase. Do not list multiple changes or earlier edits.\n\n" + truncated
         )
         req = urllib.request.Request(
             "https://api.openai.com/v1/chat/completions",
             data=json.dumps({
                 "model": "gpt-4o-mini",
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 300,
+                "max_tokens": 80,
             }).encode("utf-8"),
             headers={
                 "Content-Type": "application/json",
@@ -212,8 +216,9 @@ def _openai_semantic_changes_from_diff(diff_text, api_key, max_chars=4000):
             if not choices or not choices[0].get("message", {}).get("content"):
                 return []
             content = choices[0]["message"]["content"].strip()
-            lines = [ln.strip() for ln in content.splitlines() if ln.strip()]
-            return lines[:15]
+            # Take only the first line so we show a single description (most recent change only).
+            first_line = content.splitlines()[0].strip() if content.splitlines() else content.strip()
+            return [first_line] if first_line else []
     except Exception:
         pass
     return []
