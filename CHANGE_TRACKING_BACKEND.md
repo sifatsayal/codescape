@@ -63,13 +63,33 @@ This doc describes the **current backend process** for change tracking and resca
 
 | Method   | Path                    | Purpose                                                                                                                                                                                        |
 | -------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **POST** | `/api/rescan`           | Accept `{ "changes", "lastSendTimestamp" }`, update `last_changes` and `last_send_timestamp`, run full rescan for `initial_repo_path`, return new graph JSON (or 400/500).                     |
-| **GET**  | `/api/last_changes`     | Return `{ "lastSendTimestamp": <number\|null>, "changes": [ ... ] }` for the side panel.                                                                                                       |
+| **POST** | `/api/rescan`           | Accept `{ "changes", "lastSendTimestamp", "source": "human"\|"cursor" }`. `source` defaults to `"human"` (Cmd+S). When `"cursor"`, store in cursor bundle. Run full rescan, return new graph JSON.   |
+| **GET**  | `/api/last_changes`     | Return `{ "human": { lastSendTimestamp, changes }, "cursor": { lastSendTimestamp, changes } }`.                                                                                                 |
+| **GET**  | `/api/change_context`   | **Unified change context:** merged events (each has `source`: `"human"` or `"cursor"`), plus `touchedPaths`, `fileContexts`, `humanLastSendTimestamp`, `cursorLastSendTimestamp`. Frontend colors by source (e.g. green=human, blue=cursor). |
 | **GET**  | `/api/rescan`           | Run same full scan as initial load (files, folders, imports) for `initial_repo_path` and return graph JSON. 400 if no initial path. Used by the browser to refresh the graph after a new save. |
 | **GET**  | `/api/initial_path`     | Return `{ "path": "<initial_repo_path>" }` or `{ "path": null }`. Lets the UI know the repo path when the page was opened without `?path=`.                                                    |
 | **GET**  | `/api/load?path=<path>` | Run full scan for the given `path` and return graph JSON. Used by “Load repo” in the UI.                                                                                                       |
 
 - **Rescan implementation:** Both POST /api/rescan and GET /api/rescan call `load_repo_callback(initial_repo_path)` (in CLI terms: `build_graph_data_for_path`), which: loads config, runs `RepoScanner`, gets files/folders, runs `extract_imports_from_files`, builds `DependencyGraph`, returns `graph.build()`. So it is the same pipeline as the initial open.
+
+### Change context (GET /api/change_context)
+
+Given the most recent IDE event bundle (same as `last_changes`), the server derives **touched paths** (path, oldPath, newPath, fromFile from each event), then for each path:
+
+- **Files:** fetches `git diff HEAD -- <path>` via `_git_diff_for_path`, infers status (A/D/R/M) from event types, and calls `_describe_file_change_with_ai` for the one-line summary.
+- **Folders:** included in `touchedPaths` and in `fileContexts` with `diff: null`, `summary: null`, and `status` set from events.
+
+Response shape:
+
+- `lastSendTimestamp`: max of human and cursor timestamps (for “last updated”).
+- `events`: merged list of IDE events; each event has `source`: `"human"` or `"cursor"`.
+- `humanLastSendTimestamp`, `cursorLastSendTimestamp`: per-source timestamps.
+- `touchedPaths`: `string[]` — unique paths involved (files and folders).
+- `fileContexts`: `{ path, diff, status, summary }[]` — one entry per touched path; `diff` and `summary` are set only for file paths (folders get `null`).
+
+**Cursor vs human:** The extension sends with `source: "human"` on save (Cmd+S) and with `source: "cursor"` when the user runs **Codebase Visualizer: Cursor applied changes** (e.g. after accepting AI edits). Cursor does not yet expose an API for “AI edit completed,” so the command is the trigger.
+
+This layer does not replace the IDE recorder or git_status; it connects the event bundle to diff + AI so the frontend can show “what happened” plus “what changed in code” and “AI summary” in one place.
 
 ---
 
@@ -115,7 +135,7 @@ Example:
 | What                                                                                           | Where                                                                                           |
 | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | Recording, pending list, send on save                                                          | `vscode-extension/src/extension.ts`                                                             |
-| POST /api/rescan, GET /api/last_changes, GET /api/rescan, GET /api/initial_path, GET /api/load | `visualizer/server.py`                                                                          |
+| POST /api/rescan, GET /api/last_changes, GET /api/change_context, GET /api/rescan, GET /api/initial_path, GET /api/load | `visualizer/server.py`                                                                          |
 | Full scan (files, folders, imports)                                                            | `visualizer/cli.py` (`build_graph_data_for_path`), used by server as `load_repo_callback`       |
 | Side panel “Recent changes” + refetch on timestamp change                                      | `visualizer/ui.py` (inline JS: `loadRecentChanges`, GET /api/rescan, then fallback to loadRepo) |
 | Design and payload spec                                                                        | `CHANGE_TRACKING_PLAN.md`                                                                       |

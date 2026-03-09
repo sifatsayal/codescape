@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [{ "command": "node .cursor/hooks/notify-visualizer.js" }],
+    "afterTabFileEdit": [{ "command": "node .cursor/hooks/notify-visualizer.js" }]
+  }
+}
