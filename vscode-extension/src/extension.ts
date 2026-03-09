@@ -56,53 +56,8 @@ function getWorkspaceRelativePath(uri: vscode.Uri): string | null {
 
 let hasShownVisualizerHintOnce = false;
 
-/** Write or clear the port file at workspaceRoot/.cursor/codebase-visualizer-port.txt for Cursor hooks to notify the visualizer of AI edits. */
-function writeVisualizerPortFile(workspaceRoot: string, port: number | null): void {
-  try {
-    const dir = path.join(workspaceRoot, '.cursor');
-    const portFile = path.join(dir, 'codebase-visualizer-port.txt');
-    if (port != null && port > 0) {
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(portFile, String(port), 'utf-8');
-    } else if (fs.existsSync(portFile)) {
-      fs.unlinkSync(portFile);
-    }
-  } catch {
-    // ignore
-  }
-}
-
-/** POST to visualizer /api/clear_cursor_changes so cursor changes are removed from the side panel (call after user undoes Cursor edits). */
-function clearCursorChangesFromPanel(): Promise<void> {
-  return new Promise((resolve) => {
-    if (lastServerPort === null) {
-      resolve();
-      return;
-    }
-    const req = http.request(
-      {
-        hostname: 'localhost',
-        port: lastServerPort,
-        path: '/api/clear_cursor_changes',
-        method: 'POST',
-        headers: { 'Content-Length': 0 },
-      },
-      (res) => {
-        res.resume();
-        resolve();
-      }
-    );
-    req.on('error', () => resolve());
-    req.setTimeout(3000, () => {
-      req.destroy();
-      resolve();
-    });
-    req.end();
-  });
-}
-
-/** POST pending changes bundle to visualizer /api/rescan. On every save we send the full bundle. */
-function sendPendingChangesToVisualizer(source: 'human' | 'cursor' = 'human'): Promise<void> {
+/** POST pending changes to visualizer /api/rescan (triggers rescan); server stores for side panel. Uses Node http so it works reliably in the extension host. */
+function sendPendingChangesToVisualizer(): Promise<void> {
   return new Promise((resolve) => {
     if (lastServerPort === null) {
       if (!hasShownVisualizerHintOnce && pendingChanges.length > 0) {
@@ -117,8 +72,7 @@ function sendPendingChangesToVisualizer(source: 'human' | 'cursor' = 'human'): P
     }
     const sendTime = Date.now();
     const bundle = pendingChanges.slice();
-    const payload = { changes: bundle, lastSendTimestamp: sendTime, source };
-    const body = JSON.stringify(payload);
+    const body = JSON.stringify({ changes: bundle, lastSendTimestamp: sendTime });
     const req = http.request(
       {
         hostname: 'localhost',
@@ -132,9 +86,7 @@ function sendPendingChangesToVisualizer(source: 'human' | 'cursor' = 'human'): P
       },
       (res) => {
         if (res.statusCode === 200) {
-          if (source === 'human') {
-            lastSendTimestamp = sendTime;
-          }
+          lastSendTimestamp = sendTime;
           pendingChanges.length = 0;
         }
         res.resume();
@@ -182,24 +134,8 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
-  const cursorAppliedCommand = vscode.commands.registerCommand(
-    'codebaseVisualizer.cursorAppliedChanges',
-    async () => {
-      await sendPendingChangesToVisualizer('cursor');
-    }
-  );
-
-  const cursorUndidCommand = vscode.commands.registerCommand(
-    'codebaseVisualizer.cursorUndidChanges',
-    async () => {
-      await clearCursorChangesFromPanel();
-    }
-  );
-
   context.subscriptions.push(visualizeCommand);
   context.subscriptions.push(visualizePanelCommand);
-  context.subscriptions.push(cursorAppliedCommand);
-  context.subscriptions.push(cursorUndidCommand);
 
   // --- Change recording (file_added / file_deleted / file_body_edited / path_changed / import_*). Send on save is wired later. ---
   context.subscriptions.push(
@@ -306,21 +242,14 @@ export function activate(context: vscode.ExtensionContext) {
       if (relPath === null) return;
 
       const now = Date.now();
-      // Record file_body_edited for every modified (dirty) file so the bundle has one event per changed file.
-      for (const d of vscode.workspace.textDocuments) {
-        if (!d.isDirty) continue;
-        const p = getWorkspaceRelativePath(d.uri);
-        if (p === null) continue;
-        pendingChanges.push({ type: 'file_body_edited', path: p, timestamp: now });
-      }
-      // The document we just saved is no longer dirty; add it explicitly.
       pendingChanges.push({ type: 'file_body_edited', path: relPath, timestamp: now });
 
-      const currentContent = doc.getText();
-      const currentSpecifiers = new Set(getImportSpecifiersFromText(currentContent));
+      const currentSpecifiers = new Set(getImportSpecifiersFromText(doc.getText()));
       const hadPriorBaseline = previousImportsByFile.has(relPath);
       const previous = previousImportsByFile.get(relPath) ?? new Set<string>();
 
+      // Only diff imports when we have a prior baseline (we've seen this file saved before in this session).
+      // Otherwise we'd report all current imports as "added" on first save (e.g. after removing one).
       if (hadPriorBaseline) {
         for (const spec of currentSpecifiers) {
           if (!previous.has(spec)) {
@@ -334,8 +263,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
       }
       previousImportsByFile.set(relPath, currentSpecifiers);
-      const isCursor = (vscode.env.appName || '').toLowerCase().includes('cursor');
-      await sendPendingChangesToVisualizer(isCursor ? 'cursor' : 'human');
+      await sendPendingChangesToVisualizer();
     })
   );
 }
@@ -395,7 +323,6 @@ async function visualizeInBrowser(context: vscode.ExtensionContext) {
     const { port, process } = await bridge.startServer(repoPath, undefined, undefined, visualizerRepoPath);
     lastServerPort = port;
     hasShownVisualizerHintOnce = false;
-    writeVisualizerPortFile(repoPath, port);
 
     statusBarItem.text = '$(check) Visualization ready!';
     statusBarItem.show();
@@ -430,7 +357,6 @@ async function visualizeInBrowser(context: vscode.ExtensionContext) {
     // Handle process termination
     process.on('exit', () => {
       lastServerPort = null;
-      writeVisualizerPortFile(repoPath, null);
       vscode.window.showInformationMessage('Visualization server stopped');
     });
   } catch (error: any) {
