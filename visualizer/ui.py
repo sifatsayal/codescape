@@ -881,6 +881,15 @@ def generate_html(data: dict) -> str:
             color: #f59e0b;
         }
         
+        .dep-item.dep-item-outside .dep-item-icon {
+            color: #a855f7;
+        }
+        
+        .dep-item.dep-item-outside.inbound .dep-item-icon,
+        .dep-item.dep-item-outside.outbound .dep-item-icon {
+            color: #a855f7;
+        }
+        
         .dep-item .name {
             flex: 1;
             overflow: hidden;
@@ -1116,6 +1125,23 @@ def generate_html(data: dict) -> str:
         .link.dep-arrow.visible {
             stroke-dasharray: 8 8;
             animation: dashFlow 0.8s linear infinite;
+        }
+        
+        .link.cross-level {
+            stroke: #a855f7;
+            stroke-width: 2px;
+            cursor: pointer;
+        }
+        
+        .link.cross-level.visible {
+            stroke-opacity: 0.85;
+            stroke-dasharray: 8 8;
+            animation: dashFlow 0.8s linear infinite;
+        }
+        
+        .link.cross-level:hover {
+            stroke-opacity: 1;
+            stroke-width: 2.5px;
         }
         
         @keyframes dashFlow {
@@ -1697,14 +1723,19 @@ def generate_html(data: dict) -> str:
                 <symbol id="file-icon" viewBox="0 0 24 24">
                     <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z" fill="url(#folderSilverGrad)" filter="url(#folder-glow)"/>
                 </symbol>
-                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="#06b6d4"/>
+                <!-- Arrowheads at 0.7x size (7x4.9) for all nodes -->
+                <marker id="arrowhead" markerWidth="7" markerHeight="4.9" refX="7" refY="2.45" orient="auto">
+                    <polygon points="0 0, 7 2.45, 0 4.9" fill="#06b6d4"/>
                 </marker>
-                <marker id="arrowhead-inbound" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="#22c55e"/>
+                <marker id="arrowhead-inbound" markerWidth="7" markerHeight="4.9" refX="7" refY="2.45" orient="auto">
+                    <polygon points="0 0, 7 2.45, 0 4.9" fill="#22c55e"/>
                 </marker>
-                <marker id="arrowhead-outbound" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="#f59e0b"/>
+                <marker id="arrowhead-outbound" markerWidth="7" markerHeight="4.9" refX="7" refY="2.45" orient="auto">
+                    <polygon points="0 0, 7 2.45, 0 4.9" fill="#f59e0b"/>
+                </marker>
+                <!-- Purple arrowhead for cross-level dependencies -->
+                <marker id="arrowhead-cross-level" markerWidth="7" markerHeight="4.9" refX="7" refY="2.45" orient="auto">
+                    <polygon points="0 0, 7 2.45, 0 4.9" fill="#a855f7"/>
                 </marker>
             </defs>
         </svg>
@@ -2133,11 +2164,108 @@ def generate_html(data: dict) -> str:
             
         const g = svg.append('g');
         
+        // Track zoom state for controlled navigation
+        let previousZoomScale = 1;
+        let hasNavigatedThisGesture = false; // Track if we've navigated during current zoom-out gesture
+        let lastNavigationTime = 0; // Track when last navigation occurred
+        const NAVIGATION_COOLDOWN = 500; // Minimum ms between navigations
+        
         // Zoom behavior
         const zoom = d3.zoom()
             .scaleExtent([0.1, 4])
+            .on('start', () => {
+                // Reset navigation flag when starting a new zoom gesture
+                // Only reset if enough time has passed since last navigation
+                const now = Date.now();
+                if (now - lastNavigationTime > NAVIGATION_COOLDOWN) {
+                    hasNavigatedThisGesture = false;
+                }
+            })
             .on('zoom', (event) => {
                 g.attr('transform', event.transform);
+                
+                const currentScale = event.transform.k;
+                const zoomOutThreshold = 0.5;
+                const zoomInThreshold = 0.6; // Slightly higher threshold to require zooming back in before next navigation
+                
+                // Check if we're zooming out (scale decreasing)
+                const isZoomingOut = currentScale < previousZoomScale;
+                
+                // Only navigate if:
+                // 1. Zooming out (scale decreasing)
+                // 2. Below threshold
+                // 3. Previous scale was at or above threshold (crossing threshold)
+                // 4. Haven't navigated during this gesture yet
+                // 5. Enough time has passed since last navigation
+                const now = Date.now();
+                const canNavigate = !hasNavigatedThisGesture && 
+                                   (now - lastNavigationTime > NAVIGATION_COOLDOWN) &&
+                                   isZoomingOut &&
+                                   currentScale < zoomOutThreshold && 
+                                   previousZoomScale >= zoomOutThreshold;
+                
+                if (canNavigate) {
+                    const currentFolderPath = currentPath || '';
+                    
+                    if (currentFolderPath) {
+                        // Get parent folder path
+                        const parentPath = getParentFolderPath(currentFolderPath);
+                        
+                        // Mark that we've navigated this gesture
+                        hasNavigatedThisGesture = true;
+                        lastNavigationTime = now;
+                        
+                        // Navigate to parent folder
+                        navigateTo(parentPath, true);
+                        
+                        // Reset zoom to stabilize view at parent layer
+                        setTimeout(() => {
+                            const svg = window._graphSvg;
+                            const zoomInstance = window._graphZoom;
+                            if (svg && zoomInstance) {
+                                svg.transition()
+                                    .duration(400)
+                                    .ease(d3.easeCubicOut)
+                                    .call(zoomInstance.transform, d3.zoomIdentity.scale(1));
+                            }
+                            // Reset previous scale after transition completes
+                            setTimeout(() => {
+                                previousZoomScale = 1;
+                            }, 450);
+                        }, 50);
+                        return; // Don't update previousZoomScale here
+                    } else {
+                        // Already at root, just reset zoom
+                        setTimeout(() => {
+                            const svg = window._graphSvg;
+                            const zoomInstance = window._graphZoom;
+                            if (svg && zoomInstance) {
+                                svg.transition()
+                                    .duration(400)
+                                    .ease(d3.easeCubicOut)
+                                    .call(zoomInstance.transform, d3.zoomIdentity.scale(1));
+                            }
+                        }, 50);
+                    }
+                }
+                
+                // Update previous scale for next comparison
+                // But only if we haven't just navigated (to prevent immediate re-navigation)
+                if (!hasNavigatedThisGesture || currentScale >= zoomInThreshold) {
+                    previousZoomScale = currentScale;
+                }
+            })
+            .on('end', () => {
+                // After zoom gesture ends, allow navigation again if zoomed back in
+                const svg = window._graphSvg;
+                if (svg && svg.node()) {
+                    const finalScale = d3.zoomTransform(svg.node())?.k || 1;
+                    // If zoomed back above threshold, reset navigation flag
+                    if (finalScale >= zoomInThreshold) {
+                        hasNavigatedThisGesture = false;
+                    }
+                    previousZoomScale = finalScale;
+                }
             });
             
         svg.call(zoom);
@@ -2541,6 +2669,9 @@ def generate_html(data: dict) -> str:
         }
         
         function renderGraph() {
+            const g = window._graphG;
+            if (!g) return;
+            
             g.selectAll('*').remove();
             hideNodeTooltip();
             const width = document.getElementById('graph-container').clientWidth;
@@ -2621,6 +2752,12 @@ def generate_html(data: dict) -> str:
             });
             const containerCenterX = hierarchy.x;
             const containerCenterY = hierarchy.y;
+            const containerR = hierarchy.r;
+            
+            // Store container dimensions for use in updateSelection
+            window._containerCenterX = containerCenterX;
+            window._containerCenterY = containerCenterY;
+            window._containerR = containerR;
             
             // Resolve link source/target to node objects (with x, y, r)
             const nodeById = new Map(visibleNodes.map(n => [n.id, n]));
@@ -2731,7 +2868,7 @@ def generate_html(data: dict) -> str:
                     .text(label);
             });
             
-            // Draw links on top so inbound/outbound arrows are visible over nodes
+            // Draw same-level links as straight lines
             g.append('g')
                 .attr('class', 'links')
                 .selectAll('line')
@@ -2747,7 +2884,8 @@ def generate_html(data: dict) -> str:
                     const dx = d.target.x - (d.source?.x ?? 0);
                     const dy = d.target.y - (d.source?.y ?? 0);
                     const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-                    const targetR = (d.target.r != null ? d.target.r : getPackRadius(d.target)) + 5;
+                    // Adjusted offset for 0.7x arrowhead size: reduced from 5 to 3.5 (0.7x of 5)
+                    const targetR = (d.target.r != null ? d.target.r : getPackRadius(d.target)) + 3.5;
                     return d.target.x - (dx/dist) * targetR;
                 })
                 .attr('y2', d => {
@@ -2755,12 +2893,28 @@ def generate_html(data: dict) -> str:
                     const dx = d.target.x - (d.source?.x ?? 0);
                     const dy = d.target.y - (d.source?.y ?? 0);
                     const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-                    const targetR = (d.target.r != null ? d.target.r : getPackRadius(d.target)) + 5;
+                    // Adjusted offset for 0.7x arrowhead size: reduced from 5 to 3.5 (0.7x of 5)
+                    const targetR = (d.target.r != null ? d.target.r : getPackRadius(d.target)) + 3.5;
                     return d.target.y - (dy/dist) * targetR;
                 });
             
             updateSelection();
             applyTourDimmingAndHighlight();
+            
+            // Reset zoom scale tracking after render
+            const svg = window._graphSvg;
+            if (svg && svg.node()) {
+                const currentScale = d3.zoomTransform(svg.node())?.k || 1;
+                // Only update if not in the middle of a navigation gesture
+                const now = Date.now();
+                if (now - lastNavigationTime > NAVIGATION_COOLDOWN) {
+                    previousZoomScale = currentScale;
+                    // Reset navigation flag if zoom is above threshold
+                    if (currentScale >= 0.6) {
+                        hasNavigatedThisGesture = false;
+                    }
+                }
+            }
         }
         
         function getParentFolderPath(nodeId) {
@@ -2769,6 +2923,7 @@ def generate_html(data: dict) -> str:
             parts.pop();
             return parts.join('/');
         }
+        
         
         function applyTourDimmingAndHighlight() {
             const gRef = window._graphG;
@@ -3023,29 +3178,287 @@ def generate_html(data: dict) -> str:
             }, 150);
         }
         
+        function getRelativePathFromFile(selectedFilePath, targetFilePath) {
+            // Calculate relative path from selected file to target file
+            // Example: selectedFilePath = "client/src/redux/root-saga.ts"
+            //          targetFilePath = "client/src/redux/settings/index.js"
+            //          Result: "../settings/index.js"
+            
+            if (!selectedFilePath || !targetFilePath) return '../';
+            
+            // Normalize paths (remove leading/trailing slashes, handle root name)
+            const normalizePath = (path) => {
+                let normalized = path.replace(/^\/+|\/+$/g, ''); // Remove leading/trailing slashes
+                // Remove root name prefix if present
+                if (graphData.rootName && normalized.startsWith(graphData.rootName + '/')) {
+                    normalized = normalized.substring(graphData.rootName.length + 1);
+                }
+                return normalized.split('/').filter(Boolean);
+            };
+            
+            const selectedParts = normalizePath(selectedFilePath);
+            const targetParts = normalizePath(targetFilePath);
+            
+            // Remove filename from selected file path to get its directory
+            const selectedDirParts = selectedParts.slice(0, -1);
+            
+            // Find common prefix
+            let commonLength = 0;
+            while (commonLength < selectedDirParts.length && commonLength < targetParts.length && 
+                   selectedDirParts[commonLength] === targetParts[commonLength]) {
+                commonLength++;
+            }
+            
+            // Calculate up-levels needed (go up from selected file's directory)
+            const upLevels = selectedDirParts.length - commonLength;
+            const downPath = targetParts.slice(commonLength);
+            
+            // Build relative path
+            const upPath = upLevels > 0 ? '../'.repeat(upLevels) : '';
+            const relativePath = upPath + (downPath.length > 0 ? downPath.join('/') : '');
+            return relativePath || './' + targetParts[targetParts.length - 1];
+        }
+        
         function updateSelection() {
+            const g = window._graphG;
+            if (!g) return;
+            
             const sid = selectedNode ? selectedNode.id : null;
             const isFileSelected = selectedNode && selectedNode.type !== 'folder';
             g.selectAll('.node')
                 .classed('selected', d => d.id === sid);
-            g.selectAll('.link')
+            
+            // Remove existing outside nodes and cross-level arrows
+            g.selectAll('.outside-node').remove();
+            g.selectAll('.link-cross-level').remove();
+            
+            // Update same-level links (lines)
+            g.selectAll('.links .link')
                 .classed('visible', d => {
                     if (!sid || !isFileSelected) return false;
-                    const sourceId = d.source.id || d.source;
-                    const targetId = d.target.id || d.target;
+                    const sourceId = typeof d.source === 'object' && d.source !== null ? d.source.id : d.source;
+                    const targetId = typeof d.target === 'object' && d.target !== null ? d.target.id : d.target;
                     return sourceId === sid || targetId === sid;
                 })
-                .classed('inbound', d => isFileSelected && (d.target.id || d.target) === sid)
-                .classed('outbound', d => isFileSelected && (d.source.id || d.source) === sid)
+                .classed('inbound', d => isFileSelected && (typeof d.target === 'object' && d.target !== null ? d.target.id : d.target) === sid)
+                .classed('outbound', d => isFileSelected && (typeof d.source === 'object' && d.source !== null ? d.source.id : d.source) === sid)
                 .classed('dep-arrow', isFileSelected)
                 .attr('marker-end', d => {
                     if (!isFileSelected) return 'url(#arrowhead)';
-                    const sourceId = d.source.id || d.source;
-                    const targetId = d.target.id || d.target;
+                    const sourceId = typeof d.source === 'object' && d.source !== null ? d.source.id : d.source;
+                    const targetId = typeof d.target === 'object' && d.target !== null ? d.target.id : d.target;
                     if (targetId === sid) return 'url(#arrowhead-inbound)';
                     if (sourceId === sid) return 'url(#arrowhead-outbound)';
                     return 'url(#arrowhead)';
                 });
+            
+            // Show cross-level dependencies with outside nodes and purple arrows
+            if (isFileSelected && selectedNode) {
+                const currentFolderPath = (selectedNode.path || '').split('/').slice(0, -1).join('/');
+                const dependencies = selectedNode.dependencies || [];
+                const dependents = selectedNode.dependents || [];
+                
+                // Get container dimensions
+                const containerCx = window._containerCenterX;
+                const containerCy = window._containerCenterY;
+                const containerR = window._containerR;
+                
+                if (containerCx && containerCy && containerR) {
+                    // Find cross-level dependencies (outbound)
+                    const crossLevelDeps = dependencies.filter(depPath => {
+                        const depParent = getParentFolderPath(depPath);
+                        return depParent !== currentFolderPath;
+                    });
+                    
+                    // Find cross-level dependents (inbound)
+                    const crossLevelDependents = dependents.filter(depPath => {
+                        const depParent = getParentFolderPath(depPath);
+                        return depParent !== currentFolderPath;
+                    });
+                    
+                    // Get selected node position
+                    const selectedNodeElement = g.select(`.node[data-id="${sid}"]`);
+                    if (!selectedNodeElement.empty()) {
+                        const selectedX = parseFloat(selectedNodeElement.select('circle').attr('cx')) || selectedNode.x || 0;
+                        const selectedY = parseFloat(selectedNodeElement.select('circle').attr('cy')) || selectedNode.y || 0;
+                        const selectedR = parseFloat(selectedNodeElement.select('circle').attr('r')) || getPackRadius(selectedNode);
+                        
+                        // Create outside nodes and arrows for outbound dependencies
+                        crossLevelDeps.forEach((depPath, index) => {
+                            // Look up the actual node data for the dependency
+                            const depNode = nodesById.get(depPath);
+                            if (!depNode) return; // Skip if node not found
+                            
+                            const relativePath = getRelativePathFromFile(selectedNode.path || selectedNode.id, depPath);
+                            const totalCount = crossLevelDeps.length + crossLevelDependents.length;
+                            const angle = (Math.PI * 2 * index) / Math.max(totalCount, 1) - Math.PI / 2; // Start from top
+                            
+                            // Calculate actual node radius
+                            const nodeRadius = getPackRadius(depNode);
+                            const spacing = 50;
+                            const outsideX = containerCx + Math.cos(angle) * (containerR + spacing + nodeRadius);
+                            const outsideY = containerCy + Math.sin(angle) * (containerR + spacing + nodeRadius);
+                            
+                            // Calculate arrow start/end points on node edges
+                            const dx = outsideX - selectedX;
+                            const dy = outsideY - selectedY;
+                            const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+                            const startX = selectedX + (dx/dist) * selectedR;
+                            const startY = selectedY + (dy/dist) * selectedR;
+                            const endX = outsideX - (dx/dist) * nodeRadius;
+                            const endY = outsideY - (dy/dist) * nodeRadius;
+                            
+                            // Draw arrow from selected node to outside node
+                            const linkGroup = g.append('g').attr('class', 'link-cross-level');
+                            linkGroup.append('line')
+                                .attr('x1', startX)
+                                .attr('y1', startY)
+                                .attr('x2', endX)
+                                .attr('y2', endY)
+                                .attr('stroke', '#a855f7')
+                                .attr('stroke-width', 2)
+                                .attr('marker-end', 'url(#arrowhead-cross-level)')
+                                .attr('class', 'link cross-level dep-arrow visible')
+                                .style('cursor', 'pointer')
+                                .on('click', function(event) {
+                                    event.stopPropagation();
+                                    focusFile(depPath);
+                                });
+                            
+                            // Create outside node styled like regular node but in purple
+                            const outsideNodeGroup = g.append('g').attr('class', 'outside-node')
+                                .attr('data-id', depPath)
+                                .style('cursor', 'pointer')
+                                .on('click', function(event) {
+                                    event.stopPropagation();
+                                    focusFile(depPath);
+                                });
+                            
+                            // Circle styled like regular node but purple
+                            const nodeColor = depNode.type === 'folder' ? '#374151' : '#a855f7';
+                            const strokeColor = depNode.type === 'folder' ? '#111' : '#8b5cf6'; // Darker purple for stroke
+                            outsideNodeGroup.append('circle')
+                                .attr('cx', outsideX)
+                                .attr('cy', outsideY)
+                                .attr('r', nodeRadius)
+                                .attr('fill', nodeColor)
+                                .attr('stroke', strokeColor)
+                                .attr('stroke-width', depNode.type === 'folder' ? 2 : 1);
+                            
+                            // Label inside circle (like regular nodes)
+                            const maxChars = Math.max(1, Math.floor((nodeRadius * 1.6) / 7));
+                            const label = depNode.name.length > maxChars ? depNode.name.slice(0, maxChars - 3) + '...' : depNode.name;
+                            outsideNodeGroup.append('text')
+                                .attr('class', 'node-label-inside')
+                                .attr('x', outsideX)
+                                .attr('y', outsideY)
+                                .attr('text-anchor', 'middle')
+                                .attr('dominant-baseline', 'middle')
+                                .attr('fill', '#ffffff')
+                                .attr('font-size', '12px')
+                                .attr('font-weight', '500')
+                                .text(label);
+                            
+                            // Relative path label below node
+                            outsideNodeGroup.append('text')
+                                .attr('x', outsideX)
+                                .attr('y', outsideY + nodeRadius + 18)
+                                .attr('text-anchor', 'middle')
+                                .attr('fill', '#a855f7')
+                                .attr('font-size', '10px')
+                                .attr('font-family', 'JetBrains Mono, monospace')
+                                .text(relativePath || '../');
+                        });
+                        
+                        // Create outside nodes and arrows for inbound dependencies
+                        crossLevelDependents.forEach((depPath, index) => {
+                            // Look up the actual node data for the dependency
+                            const depNode = nodesById.get(depPath);
+                            if (!depNode) return; // Skip if node not found
+                            
+                            const relativePath = getRelativePathFromFile(selectedNode.path || selectedNode.id, depPath);
+                            const totalCount = crossLevelDeps.length + crossLevelDependents.length;
+                            const angle = (Math.PI * 2 * (crossLevelDeps.length + index)) / Math.max(totalCount, 1) - Math.PI / 2; // Start from top
+                            
+                            // Calculate actual node radius
+                            const nodeRadius = getPackRadius(depNode);
+                            const spacing = 50;
+                            const outsideX = containerCx + Math.cos(angle) * (containerR + spacing + nodeRadius);
+                            const outsideY = containerCy + Math.sin(angle) * (containerR + spacing + nodeRadius);
+                            
+                            // Calculate arrow start/end points on node edges
+                            const dx = selectedX - outsideX;
+                            const dy = selectedY - outsideY;
+                            const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+                            const startX = outsideX + (dx/dist) * nodeRadius;
+                            const startY = outsideY + (dy/dist) * nodeRadius;
+                            const endX = selectedX - (dx/dist) * selectedR;
+                            const endY = selectedY - (dy/dist) * selectedR;
+                            
+                            // Draw arrow from outside node to selected node
+                            const linkGroup = g.append('g').attr('class', 'link-cross-level');
+                            linkGroup.append('line')
+                                .attr('x1', startX)
+                                .attr('y1', startY)
+                                .attr('x2', endX)
+                                .attr('y2', endY)
+                                .attr('stroke', '#a855f7')
+                                .attr('stroke-width', 2)
+                                .attr('marker-end', 'url(#arrowhead-cross-level)')
+                                .attr('class', 'link cross-level dep-arrow visible')
+                                .style('cursor', 'pointer')
+                                .on('click', function(event) {
+                                    event.stopPropagation();
+                                    focusFile(depPath);
+                                });
+                            
+                            // Create outside node styled like regular node but in purple
+                            const outsideNodeGroup = g.append('g').attr('class', 'outside-node')
+                                .attr('data-id', depPath)
+                                .style('cursor', 'pointer')
+                                .on('click', function(event) {
+                                    event.stopPropagation();
+                                    focusFile(depPath);
+                                });
+                            
+                            // Circle styled like regular node but purple
+                            const nodeColor = depNode.type === 'folder' ? '#374151' : '#a855f7';
+                            const strokeColor = depNode.type === 'folder' ? '#111' : '#8b5cf6'; // Darker purple for stroke
+                            outsideNodeGroup.append('circle')
+                                .attr('cx', outsideX)
+                                .attr('cy', outsideY)
+                                .attr('r', nodeRadius)
+                                .attr('fill', nodeColor)
+                                .attr('stroke', strokeColor)
+                                .attr('stroke-width', depNode.type === 'folder' ? 2 : 1);
+                            
+                            // Label inside circle (like regular nodes)
+                            const maxChars = Math.max(1, Math.floor((nodeRadius * 1.6) / 7));
+                            const label = depNode.name.length > maxChars ? depNode.name.slice(0, maxChars - 3) + '...' : depNode.name;
+                            outsideNodeGroup.append('text')
+                                .attr('class', 'node-label-inside')
+                                .attr('x', outsideX)
+                                .attr('y', outsideY)
+                                .attr('text-anchor', 'middle')
+                                .attr('dominant-baseline', 'middle')
+                                .attr('fill', '#ffffff')
+                                .attr('font-size', '12px')
+                                .attr('font-weight', '500')
+                                .text(label);
+                            
+                            // Relative path label below node
+                            outsideNodeGroup.append('text')
+                                .attr('x', outsideX)
+                                .attr('y', outsideY + nodeRadius + 18)
+                                .attr('text-anchor', 'middle')
+                                .attr('fill', '#a855f7')
+                                .attr('font-size', '10px')
+                                .attr('font-family', 'JetBrains Mono, monospace')
+                                .text(relativePath || '../');
+                        });
+                    }
+                }
+            }
         }
 
         function escapeAttr(s) {
@@ -3106,7 +3519,6 @@ def generate_html(data: dict) -> str:
                     return sep + `<span class="${spanClass}">${escapeAttr(seg)}</span>`;
                 }).join('');
                 return `<div class="dep-item ${cls} dep-item-outside" onclick="focusFile('${escJs(p)}')">
-                    <span class="dep-item-icon" aria-hidden="true">${arrow}</span>
                     <span class="name dep-item-name-clickable" title="${escapeAttr(p)}">${escapeAttr(name)}</span>
                     <div class="dep-item-location-wrap" onclick="event.stopPropagation()">
                         <button type="button" class="dep-item-path-toggle" title="Expand to show full path" aria-label="Show full path" onclick="this.closest('.dep-item').classList.toggle('show-full-path')">
