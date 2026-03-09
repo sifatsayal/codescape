@@ -12,9 +12,7 @@
   ],
   "activationEvents": [
     "onCommand:codebaseVisualizer.visualize",
-    "onCommand:codebaseVisualizer.visualizeEmbedded",
-    "onCommand:codebaseVisualizer.cursorAppliedChanges",
-    "onCommand:codebaseVisualizer.cursorUndidChanges"
+    "onCommand:codebaseVisualizer.visualizeEmbedded"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -27,16 +25,6 @@
       {
         "command": "codebaseVisualizer.visualizeEmbedded",
         "title": "Visualize Codebase (Embedded)",
-        "category": "Codebase Visualizer"
-      },
-      {
-        "command": "codebaseVisualizer.cursorAppliedChanges",
-        "title": "Cursor applied changes",
-        "category": "Codebase Visualizer"
-      },
-      {
-        "command": "codebaseVisualizer.cursorUndidChanges",
-        "title": "I undid Cursor changes (remove from panel)",
         "category": "Codebase Visualizer"
       }
     ],
