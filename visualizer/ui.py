@@ -1787,7 +1787,7 @@ def generate_html(data: dict) -> str:
             <div id="recent-changes-last-send" class="recent-changes-muted">Last Cmd+S: —</div>
             <div id="recent-changes-list" class="recent-changes-list"></div>
             <div id="recent-changes-git-section" class="recent-changes-git-section">
-                <div id="recent-changes-git-title" class="recent-changes-title">Git working tree</div>
+                <div id="recent-changes-git-title" class="recent-changes-title">Previous changes (from earlier Cmd+S)</div>
                 <div id="recent-changes-git-list" class="recent-changes-list"></div>
             </div>
             <div class="recent-changes-tip">Open via Cursor: <strong>Codebase Visualizer: Visualize Codebase</strong> for live updates on save.</div>
@@ -1938,7 +1938,7 @@ def generate_html(data: dict) -> str:
         let folderCountMode = 'direct';  // 'direct' | 'recursive'
         let selectionHistory = [];
         let historyIndex = -1;
-        let lastChangesData = { lastSendTimestamp: null, changes: [] };
+        let lastChangesData = { lastSendTimestamp: null, changes: [], batches: [] };
         let gitStatusData = { modified: [], added: [], deleted: [], renamed: [] };
 
         const FOLDER_COLOR = '#7c3aed';
@@ -2408,6 +2408,11 @@ def generate_html(data: dict) -> str:
             return norm === folderPath || norm.startsWith(folderPath + '/');
         }
         let filteredChangesForPanel = [];
+        let expandedChangeDescriptions = {};
+        let expandedGitSummaries = {};
+        function changeKey(c) {
+            return (c.type || '') + '|' + (c.path || c.fromFile || c.oldPath || '') + '|' + (c.toFile || c.newPath || '');
+        }
         function updateChangesInFolderPanel() {
             const titleEl = document.getElementById('recent-changes-title');
             const listEl = document.getElementById('recent-changes-list');
@@ -2428,31 +2433,73 @@ def generate_html(data: dict) -> str:
                         '<button type="button" class="change-describe-btn" onclick="describeChange(this)">Describe</button>' +
                         '<div class="change-description" style="display:none;"></div></div>';
                 }).join('');
+                filteredChangesForPanel.forEach(function(c, i) {
+                    const key = changeKey(c);
+                    const stored = expandedChangeDescriptions[key];
+                    if (!stored) return;
+                    const row = listEl.children[i];
+                    if (!row) return;
+                    const descEl = row.querySelector('.change-description');
+                    const btn = row.querySelector('.change-describe-btn');
+                    if (descEl && btn) {
+                        descEl.textContent = stored.text;
+                        descEl.style.display = 'block';
+                        btn.textContent = 'Hide';
+                    }
+                });
             }
             if (gitTitleEl && gitListEl) {
-                const g = gitStatusData;
-                const mod = (g.modified || []).filter(p => isPathInFolder(p, folderPath));
-                const add = (g.added || []).filter(p => isPathInFolder(p, folderPath));
-                const del_ = (g.deleted || []).filter(p => isPathInFolder(p, folderPath));
-                const ren = (g.renamed || []).filter(r => isPathInFolder(r.oldPath, folderPath) || isPathInFolder(r.newPath, folderPath));
-                const total = mod.length + add.length + del_.length + ren.length;
-                gitTitleEl.textContent = folderPath ? 'Git working tree (this folder)' : 'Git working tree';
-                if (total === 0) {
-                    gitListEl.innerHTML = '<div class="recent-changes-muted">No uncommitted changes</div>';
+                gitTitleEl.textContent = folderPath ? 'Previous changes (this folder)' : 'Previous changes (from earlier Cmd+S)';
+                const batches = lastChangesData.batches || [];
+                const previousBatches = batches.length > 1 ? batches.slice(0, -1) : [];
+                let previousFlat = [];
+                previousBatches.forEach(function(b) {
+                    const ts = b.timestamp;
+                    (b.changes || []).forEach(function(c) {
+                        if (isChangeInFolder(c, folderPath)) previousFlat.push({ change: c, batchTimestamp: ts });
+                    });
+                });
+                if (previousFlat.length === 0) {
+                    gitListEl.innerHTML = '<div class="recent-changes-muted">No previous changes yet. Save with Cmd+S to build history.</div>';
                 } else {
-                    let html = '';
-                    function gitLine(path, status, label) {
-                        return '<div class="git-status-line-wrap"><div class="git-status-line">' +
-                            '<span class="git-status-badge ' + status + '">' + (status === 'modified' ? 'M' : status === 'added' ? 'A' : status === 'deleted' ? 'D' : 'R') + '</span>' +
-                            '<span>' + escapeAttr(label || path) + '</span>' +
-                            '<button type="button" class="git-status-ai-btn" onclick="describeFileChange(this)" data-path="' + escapeAttr(path) + '" data-status="' + (status === 'modified' ? 'M' : status === 'added' ? 'A' : status === 'deleted' ? 'D' : 'R') + '">AI Summarize</button></div>' +
-                            '<div class="git-status-ai-summary" style="display:none;"></div></div>';
+                    function pathFromChange(c) {
+                        return (c.path || c.newPath || c.toFile || c.fromFile || '').replace(/\\\\/g, '/').trim();
                     }
-                    mod.forEach(p => { html += gitLine(p, 'modified', p); });
-                    add.forEach(p => { html += gitLine(p, 'added', p); });
-                    del_.forEach(p => { html += gitLine(p, 'deleted', p); });
-                    ren.forEach(r => { html += gitLine(r.newPath, 'renamed', r.oldPath + ' → ' + r.newPath); });
+                    function statusFromChange(c) {
+                        const t = (c.type || '').toLowerCase();
+                        if (t === 'file_added' || t === 'folder_added') return 'A';
+                        if (t === 'file_deleted' || t === 'folder_deleted') return 'D';
+                        if (t === 'path_changed' || t === 'folder_path_changed') return 'R';
+                        return 'M';
+                    }
+                    let html = '';
+                    previousFlat.forEach(function(item) {
+                        const c = item.change;
+                        const path = pathFromChange(c);
+                        const status = statusFromChange(c);
+                        const label = formatChangeLine(c).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        const batchTs = item.batchTimestamp;
+                        const desc = (c.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        html += '<div class="git-status-line-wrap" data-batch-ts="' + escapeAttr(String(batchTs)) + '">' +
+                            '<div class="git-status-line">' +
+                            '<span class="git-status-badge ' + (status === 'M' ? 'modified' : status === 'A' ? 'added' : status === 'D' ? 'deleted' : 'renamed') + '">' + status + '</span>' +
+                            '<span>' + escapeAttr(label || path) + '</span>' +
+                            '<button type="button" class="git-status-ai-btn" onclick="describeFileChange(this)" data-path="' + escapeAttr(path) + '" data-status="' + status + '" data-batch-ts="' + escapeAttr(String(batchTs)) + '">Describe</button></div>' +
+                            '<div class="git-status-ai-summary" style="display:' + (desc ? 'block' : 'none') + ';">' + desc + '</div></div>';
+                    });
                     gitListEl.innerHTML = html;
+                    [].forEach.call(gitListEl.querySelectorAll('.git-status-line-wrap'), function(wrap) {
+                        const btn = wrap.querySelector('.git-status-ai-btn');
+                        const summaryEl = wrap.querySelector('.git-status-ai-summary');
+                        if (!btn || !summaryEl) return;
+                        const p = btn.getAttribute('data-path');
+                        const bts = btn.getAttribute('data-batch-ts');
+                        const cacheKey = p + '::' + (bts || 'latest');
+                        if (p && expandedGitSummaries[cacheKey]) {
+                            summaryEl.textContent = expandedGitSummaries[cacheKey];
+                            summaryEl.style.display = 'block';
+                        }
+                    });
                 }
             }
         }
@@ -2465,6 +2512,21 @@ def generate_html(data: dict) -> str:
             const change = filteredChangesForPanel[idx];
             const descEl = row.querySelector('.change-description');
             if (!descEl) return;
+            const key = changeKey(change);
+            if (descEl.style.display === 'block' && descEl.textContent && descEl.textContent !== 'Loading…') {
+                descEl.style.display = 'none';
+                descEl.textContent = '';
+                btn.textContent = 'Describe';
+                delete expandedChangeDescriptions[key];
+                return;
+            }
+            const stored = expandedChangeDescriptions[key];
+            if (stored) {
+                descEl.textContent = stored.text;
+                descEl.style.display = 'block';
+                btn.textContent = 'Hide';
+                return;
+            }
             btn.disabled = true;
             descEl.style.display = 'block';
             descEl.textContent = 'Loading…';
@@ -2475,9 +2537,14 @@ def generate_html(data: dict) -> str:
                     body: JSON.stringify({ change: change })
                 });
                 const data = await resp.json();
-                descEl.textContent = data.description || (data.error ? 'Error: ' + data.error : 'No description.');
+                const text = data.description || (data.error ? 'Error: ' + data.error : 'No description.');
+                descEl.textContent = text;
+                expandedChangeDescriptions[key] = { text: text };
+                btn.textContent = 'Hide';
             } catch (e) {
                 descEl.textContent = 'Error: ' + e.message;
+                expandedChangeDescriptions[key] = { text: 'Error: ' + e.message };
+                btn.textContent = 'Hide';
             }
             btn.disabled = false;
         }
@@ -2485,23 +2552,36 @@ def generate_html(data: dict) -> str:
         async function describeFileChange(btn) {
             const path = btn.getAttribute('data-path');
             const status = btn.getAttribute('data-status') || 'M';
+            const batchTs = btn.getAttribute('data-batch-ts');
             if (!path) return;
             const wrap = btn.closest('.git-status-line-wrap');
             const summaryEl = wrap ? wrap.querySelector('.git-status-ai-summary') : null;
             if (!summaryEl) return;
+            const cacheKey = path + '::' + (batchTs || 'latest');
+            if (expandedGitSummaries[cacheKey]) {
+                summaryEl.textContent = expandedGitSummaries[cacheKey];
+                summaryEl.style.display = 'block';
+                return;
+            }
             summaryEl.style.display = 'block';
             summaryEl.textContent = 'Loading…';
             btn.disabled = true;
+            const body = { path: path, status: status };
+            if (batchTs != null && batchTs !== '') body.batchTimestamp = Number(batchTs);
             try {
                 const resp = await fetch(window.location.origin + '/api/describe_file_change', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ path: path, status: status })
+                    body: JSON.stringify(body)
                 });
                 const data = await resp.json();
-                summaryEl.textContent = data.description || (data.error ? 'Error: ' + data.error : 'No summary.');
+                const text = data.description || (data.error ? 'Error: ' + data.error : 'No summary.');
+                summaryEl.textContent = text;
+                expandedGitSummaries[cacheKey] = text;
             } catch (e) {
-                summaryEl.textContent = 'Error: ' + e.message;
+                const errText = 'Error: ' + e.message;
+                summaryEl.textContent = errText;
+                expandedGitSummaries[cacheKey] = errText;
             }
             btn.disabled = false;
         }
@@ -3940,8 +4020,10 @@ def generate_html(data: dict) -> str:
                 if (!data) { updateChangesInFolderPanel(); return; }
                 const ts = data.lastSendTimestamp;
                 const changes = data.changes || [];
+                const batches = data.batches || [];
                 lastChangesData.changes = changes;
                 lastChangesData.lastSendTimestamp = ts;
+                lastChangesData.batches = batches;
                 lastEl.textContent = 'Last Cmd+S: ' + (ts == null ? 'Never' : new Date(ts).toISOString());
                 updateChangesInFolderPanel();
                 if (ts !== lastSeenSendTimestamp) {

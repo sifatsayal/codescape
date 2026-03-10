@@ -6,6 +6,7 @@ import platform
 import subprocess
 import socketserver
 import socket
+import time
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -77,9 +78,25 @@ def _git_diff_for_path(repo_path, relative_path):
     repo_path = Path(repo_path).resolve()
     if not repo_path.is_dir() or not relative_path:
         return None
+    path = (relative_path or "").strip().replace("\\", "/")
+    if not path:
+        return None
+    # If path is absolute, make it relative to repo so git diff works
+    try:
+        path_obj = Path(path)
+        if path_obj.is_absolute() or (len(path) > 1 and path[1] == ":"):
+            try:
+                resolved = (repo_path / path).resolve() if not path_obj.is_absolute() else path_obj.resolve()
+                path = str(resolved.relative_to(repo_path)).replace("\\", "/")
+            except (ValueError, OSError):
+                pass
+        elif path.startswith("/"):
+            path = path.lstrip("/")
+    except Exception:
+        pass
     try:
         result = subprocess.run(
-            ["git", "diff", "HEAD", "--", relative_path],
+            ["git", "diff", "HEAD", "--", path],
             cwd=str(repo_path),
             capture_output=True,
             text=True,
@@ -139,7 +156,7 @@ def _describe_file_change_with_ai(repo_path, relative_path, status):
         return "File renamed or moved."
     diff = _git_diff_for_path(repo_path, path)
     if not diff:
-        return "File modified (no diff available)."
+        return "File modified."
     api_key = os.environ.get("OPENAI_API_KEY")
     if api_key:
         summary = _openai_one_line_summary(diff, api_key)
@@ -469,8 +486,14 @@ def create_handler(html_content, load_repo_callback=None, initial_repo_path=None
     # Store last received changes and timestamp for visualizer side panel
     last_changes = []
     last_send_timestamp = None  # from extension "Last Cmd+S"
+    # History of Cmd+S batches: each entry is { "timestamp": ts, "changes": [...] }. Newest at end. Used so "Git working tree" shows previous changes (each keeping its description).
+    change_batches = []
+    _MAX_CHANGE_BATCHES = 50
     # Track the currently active repo path (updated by /api/load). Fall back to initial_repo_path.
     current_repo_path = initial_repo_path
+    # Cache descriptions by (repo, path, batch_ts) so each Cmd+S batch's change keeps its own description. batch_ts None = latest.
+    file_description_cache = {}
+    description_cache_by_batch = {}
 
     class VisualizationHandler(http.server.SimpleHTTPRequestHandler):
         """Custom HTTP handler to serve the visualization HTML."""
@@ -486,9 +509,28 @@ def create_handler(html_content, load_repo_callback=None, initial_repo_path=None
                     self._send_json(200, {'path': '', 'cancelled': True})
                 return
             if parsed.path == '/api/last_changes':
+                repo = current_repo_path or initial_repo_path
+                def path_from_change(ch):
+                    if not isinstance(ch, dict):
+                        return None
+                    return (ch.get('path') or ch.get('newPath') or ch.get('toFile') or ch.get('fromFile') or '').strip().replace('\\', '/').lstrip('/')
+                def enrich_batch(b):
+                    ts = b.get('timestamp')
+                    out = []
+                    for ch in b.get('changes', []):
+                        c = dict(ch)
+                        p = path_from_change(c)
+                        if p and repo:
+                            key = (repo, p, ts)
+                            if key in description_cache_by_batch:
+                                c['description'] = description_cache_by_batch[key]
+                        out.append(c)
+                    return {'timestamp': ts, 'changes': out}
+                batches_for_client = [enrich_batch(b) for b in change_batches]
                 self._send_json(200, {
                     'lastSendTimestamp': last_send_timestamp,
                     'changes': list(last_changes),
+                    'batches': batches_for_client,
                 })
                 return
             if parsed.path == '/api/initial_path':
@@ -617,6 +659,11 @@ def create_handler(html_content, load_repo_callback=None, initial_repo_path=None
                         return
                 last_changes.clear()
                 last_changes.extend(changes)
+                if changes:
+                    batch_ts = last_send_timestamp if last_send_timestamp is not None else time.time()
+                    change_batches.append({'timestamp': batch_ts, 'changes': list(changes)})
+                    if len(change_batches) > _MAX_CHANGE_BATCHES:
+                        change_batches.pop(0)
                 try:
                     graph_data = load_repo_callback(initial_repo_path)
                     if isinstance(graph_data, dict) and 'error' in graph_data:
@@ -643,6 +690,7 @@ def create_handler(html_content, load_repo_callback=None, initial_repo_path=None
                     t = change.get('type', '')
                     path = change.get('path') or change.get('newPath') or change.get('toFile')
                     if path:
+                        path = path.strip().replace('\\', '/')
                         status = 'M'
                         if t in ('file_added', 'folder_added'):
                             status = 'A'
@@ -653,6 +701,9 @@ def create_handler(html_content, load_repo_callback=None, initial_repo_path=None
                         ai_desc = _describe_file_change_with_ai(initial_repo_path, path, status)
                         if ai_desc and ai_desc != 'File modified.':
                             description = ai_desc
+                        if change_batches:
+                            batch_ts = change_batches[-1]['timestamp']
+                            description_cache_by_batch[(initial_repo_path, path, batch_ts)] = description
                 self._send_json(200, {'description': description})
                 return
             if parsed.path == '/api/describe_file_change':
@@ -671,11 +722,48 @@ def create_handler(html_content, load_repo_callback=None, initial_repo_path=None
                 if not path:
                     self._send_json(400, {'error': 'Missing path'})
                     return
-                repo = initial_repo_path
+                repo = current_repo_path or initial_repo_path
                 if not repo:
                     self._send_json(400, {'error': 'No repo path (start visualizer with --repo)'})
                     return
+                batch_ts = data.get('batchTimestamp')
+                if batch_ts is None and change_batches:
+                    batch_ts = change_batches[-1]['timestamp']
+                cache_key = (repo, path, batch_ts) if batch_ts is not None else (repo, path, None)
+                if cache_key in description_cache_by_batch:
+                    self._send_json(200, {'description': description_cache_by_batch[cache_key]})
+                    return
+                if (repo, path) in file_description_cache and batch_ts is None:
+                    self._send_json(200, {'description': file_description_cache[(repo, path)]})
+                    return
                 description = _describe_file_change_with_ai(repo, path, status)
+                path_norm = (path or "").strip().replace("\\", "/").lstrip("/").lower()
+                changes_to_search = last_changes if batch_ts is None and last_changes else []
+                if not changes_to_search and batch_ts is not None:
+                    for b in change_batches:
+                        if b.get('timestamp') == batch_ts:
+                            changes_to_search = b.get('changes', [])
+                            break
+                if changes_to_search and (description == "File modified." or "no diff" in description.lower()):
+                    for ch in changes_to_search:
+                        if not isinstance(ch, dict):
+                            continue
+                        for key in ("path", "newPath", "toFile", "fromFile", "oldPath"):
+                            p = (ch.get(key) or "").strip().replace("\\", "/").lstrip("/").lower()
+                            if not p:
+                                continue
+                            if p == path_norm or p.endswith("/" + path_norm) or path_norm.endswith("/" + p):
+                                description = _describe_change_rule_based(ch)
+                                break
+                        else:
+                            continue
+                        break
+                if "no diff" in description.lower():
+                    description = "File modified."
+                if batch_ts is not None:
+                    description_cache_by_batch[(repo, path, batch_ts)] = description
+                else:
+                    file_description_cache[(repo, path)] = description
                 self._send_json(200, {'description': description})
                 return
             if parsed.path == '/api/generate_tour':
