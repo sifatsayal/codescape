@@ -465,6 +465,18 @@ def generate_html(data: dict) -> str:
             padding-top: 16px;
             border-top: 1px solid rgba(100, 100, 150, 0.2);
         }
+        .recent-changes-panel.tour-changes-highlight {
+            border: 3px solid #06b6d4;
+            border-radius: 10px;
+            padding: 16px;
+            margin-top: 24px;
+            box-shadow: 0 0 0 3px #06b6d4, 0 0 20px #06b6d4;
+            animation: tour-changes-glow 1.2s ease-in-out infinite;
+        }
+        @keyframes tour-changes-glow {
+            0%, 100% { box-shadow: 0 0 0 3px #06b6d4, 0 0 20px #06b6d4; border-color: #06b6d4; }
+            50% { box-shadow: 0 0 0 4px #06b6d4, 0 0 32px #06b6d4, 0 0 48px rgba(6, 182, 212, 0.5); border-color: #22d3ee; }
+        }
         .recent-changes-title {
             font-size: 11px;
             text-transform: uppercase;
@@ -1487,6 +1499,12 @@ def generate_html(data: dict) -> str:
         }
         #tour-overlay.active #tour-panel.tour-panel--bottom-center {
             transform: translate(-50%, 0);
+        }
+        #tour-panel.tour-panel--bottom-right {
+            left: auto;
+            right: 24px;
+            top: auto;
+            bottom: 420px;
         }
         #tour-panel-inner {
             background: rgba(15, 15, 25, 0.98);
@@ -2980,7 +2998,7 @@ def generate_html(data: dict) -> str:
                 return;
             }
             const step = window._tourSteps[window._tourStepIndex];
-            if (step.zoomOut || step.sidebarStep || step.noDimming || step.sizingStep || step.aiSummaryStep || !step.nodeId) {
+            if (step.zoomOut || step.sidebarStep || step.noDimming || step.sizingStep || step.changesStep || step.aiSummaryStep || !step.nodeId) {
                 gRef.selectAll('.node').attr('opacity', 1).classed('tour-dimmed', false);
                 return;
             }
@@ -3031,7 +3049,7 @@ def generate_html(data: dict) -> str:
             if (sidebarEl) sidebarEl.classList.toggle('tour-sidebar-highlight', isSidebarStep);
             var panelEl = document.getElementById('tour-panel');
             if (panelEl) {
-                panelEl.classList.remove('tour-panel--bottom-left', 'tour-panel--top-right', 'tour-panel--top-left', 'tour-panel--bottom-center');
+                panelEl.classList.remove('tour-panel--bottom-left', 'tour-panel--top-right', 'tour-panel--top-left', 'tour-panel--bottom-center', 'tour-panel--bottom-right');
                 panelEl.classList.add('tour-panel--' + panelPosition.replace(/\s/g, '-'));
             }
             backBtn.style.display = isSidebarStep ? 'none' : '';
@@ -3126,6 +3144,30 @@ def generate_html(data: dict) -> str:
             updateSidebarNav();
         }
 
+        function runChangesStepDemo() {
+            // Use the first tour step's nodeId as the demo file
+            var firstStep = window._tourSteps && window._tourSteps[0];
+            var nodeId = firstStep && firstStep.nodeId;
+            if (!nodeId) return;
+            var node = nodesById.get(nodeId) || graphData.nodes.find(function(n) { return (n.id || n.path) === nodeId; });
+            if (!node) return;
+            selectedNode = node;
+            pushHistory(node.id || node.path || nodeId);
+            var parts = (node.path || node.id || nodeId).split('/');
+            parts.pop();
+            currentPath = parts.length ? parts.join('/') : '';
+            updateBreadcrumb();
+            renderSidePanel();
+            updateSelection();
+            updateSidebarNav();
+            setTimeout(function() {
+                var panel = document.getElementById('recent-changes-panel');
+                if (!panel) return;
+                panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                panel.classList.add('tour-changes-highlight');
+            }, 500);
+        }
+
         function runAiSummaryStepDemo() {
             // Use the first tour step's nodeId as the demo file
             var firstStep = window._tourSteps && window._tourSteps[0];
@@ -3173,7 +3215,8 @@ def generate_html(data: dict) -> str:
             window._tourSteps.push(
                 { title: 'Follow the Arrows', body: 'See the arrows on this file? Lines coming IN mean other files depend on it. Lines going OUT mean it imports others. Click around — explore the connections yourself.', nodeId: arrowsNodeId, noDimming: true, allowGraphInteraction: true, position: 'top-right' },
                 { title: 'Size = Importance', body: 'Notice how nodes are different sizes? The bigger the bubble, the more files depend on it. This is called PageRank. Zoom in and out — explore which files matter most in this codebase.', nodeId: null, noDimming: true, allowGraphInteraction: true, sizingStep: true, position: 'top-left' },
-                { title: 'Understand Any File Instantly', body: 'See those tabs? Click Overview to get a plain-English summary of any file. Impact shows what breaks if you change it. Edit safely warns you before you touch something critical. Read next tells you where to go next.', nodeId: null, noDimming: true, allowGraphInteraction: true, aiSummaryStep: true, position: 'bottom-left' }
+                { title: 'Track Changes Live', body: 'Every time you save a file, Codescape detects what changed. The Git Working Tree shows which files have been modified on your branch. Click \\'AI Summarize\\' to instantly understand what changed and why it matters.', nodeId: null, noDimming: true, allowGraphInteraction: true, changesStep: true, position: 'bottom-right' },
+                { title: 'Understand Any File Instantly', body: 'See those tabs? Click Overview to get a plain-English summary of any file. Impact shows what breaks if you change it. Edit safely warns you before you touch something critical. Read next tells you where to go next.', nodeId: null, noDimming: true, allowGraphInteraction: true, aiSummaryStep: true, position: 'bottom-right' }
             );
             if (!window._tourSteps.length) return;
             window._tourActive = true;
@@ -3203,7 +3246,7 @@ def generate_html(data: dict) -> str:
             if (goBtn) { goBtn.style.display = ''; goBtn.disabled = false; }
             var panelEl = document.getElementById('tour-panel');
             if (panelEl) {
-                panelEl.classList.remove('tour-panel--top-right', 'tour-panel--top-left', 'tour-panel--bottom-center');
+                panelEl.classList.remove('tour-panel--top-right', 'tour-panel--top-left', 'tour-panel--bottom-center', 'tour-panel--bottom-right');
                 panelEl.classList.add('tour-panel--bottom-left');
             }
             window._tourStepsPromise = fetch(window.location.origin + '/api/generate_tour', {
@@ -3245,6 +3288,8 @@ def generate_html(data: dict) -> str:
             if (overlayEl) overlayEl.classList.remove('tour-overlay-allow-graph-click');
             const sidebarEl = document.getElementById('sidebar');
             if (sidebarEl) sidebarEl.classList.remove('tour-sidebar-highlight');
+            var changesPanel = document.getElementById('recent-changes-panel');
+            if (changesPanel) changesPanel.classList.remove('tour-changes-highlight');
             document.querySelectorAll('.ai-summary-section.tour-ai-summary-highlight').forEach(function(el) {
                 el.classList.remove('tour-ai-summary-highlight');
             });
@@ -3281,6 +3326,8 @@ def generate_html(data: dict) -> str:
                     deselectAndZoomOutToRoot();
                 } else if (step.sidebarStep) {
                     // No navigation, no zoom; sidebar highlight is applied in updateTourUI
+                } else if (step.changesStep) {
+                    runChangesStepDemo();
                 } else if (step.aiSummaryStep) {
                     runAiSummaryStepDemo();
                 } else if (step.nodeId) {
@@ -3309,6 +3356,8 @@ def generate_html(data: dict) -> str:
                     deselectAndZoomOutToRoot();
                 } else if (step.sidebarStep) {
                     // No navigation; sidebar highlight is removed in updateTourUI when we leave this step
+                } else if (step.changesStep) {
+                    runChangesStepDemo();
                 } else if (step.aiSummaryStep) {
                     runAiSummaryStepDemo();
                 } else if (step.nodeId) {
