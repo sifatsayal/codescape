@@ -370,7 +370,7 @@ def generate_html(data: dict) -> str:
             position: fixed;
             top: 60px;
             left: 0;
-            right: 380px;
+            right: 0;
             bottom: 0;
             background: #0a0a12;
         }
