@@ -1447,8 +1447,6 @@ def generate_html(data: dict) -> str:
         #tour-panel {
             position: fixed;
             left: 24px;
-            right: auto;
-            top: auto;
             bottom: 72px;
             min-width: 380px;
             width: 380px;
@@ -1459,52 +1457,12 @@ def generate_html(data: dict) -> str:
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
             transform: translateY(120%);
             opacity: 0;
-            transition:
-                left 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
-                right 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
-                top 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
-                bottom 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
-                transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
-                opacity 0.3s ease;
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
             z-index: 51;
         }
         #tour-overlay.active #tour-panel {
             transform: translateY(0);
             opacity: 1;
-        }
-        #tour-panel.tour-panel--bottom-left {
-            left: 24px;
-            right: auto;
-            top: auto;
-            bottom: 72px;
-        }
-        #tour-panel.tour-panel--top-right {
-            left: auto;
-            right: 24px;
-            top: 72px;
-            bottom: auto;
-        }
-        #tour-panel.tour-panel--top-left {
-            left: 24px;
-            right: auto;
-            top: 72px;
-            bottom: auto;
-        }
-        #tour-panel.tour-panel--bottom-center {
-            left: 50%;
-            right: auto;
-            top: auto;
-            bottom: 72px;
-            transform: translate(-50%, 120%);
-        }
-        #tour-overlay.active #tour-panel.tour-panel--bottom-center {
-            transform: translate(-50%, 0);
-        }
-        #tour-panel.tour-panel--bottom-right {
-            left: auto;
-            right: 24px;
-            top: auto;
-            bottom: 420px;
         }
         #tour-panel-inner {
             background: rgba(15, 15, 25, 0.98);
@@ -1569,6 +1527,25 @@ def generate_html(data: dict) -> str:
             height: 6px;
             border-radius: 3px;
             background: #06b6d4;
+        }
+        .tour-pro-tip {
+            margin-top: 8px;
+            margin-bottom: 18px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: rgba(30, 30, 40, 0.95);
+            border: 1px solid rgba(161, 98, 7, 0.5);
+            display: none;
+            font-size: 11px;
+            line-height: 1.5;
+            color: #fbbf24;
+            display: none;
+        }
+        .tour-pro-tip-icon {
+            margin-right: 6px;
+        }
+        .tour-pro-tip-text {
+            color: #facc15;
         }
         .tour-actions {
             display: flex;
@@ -1835,6 +1812,10 @@ def generate_html(data: dict) -> str:
                     <h2 class="tour-step-title" id="tour-step-title">Main Entry Point</h2>
                     <p class="tour-step-body" id="tour-step-body">Placeholder explanation for this step. The Virtual Guide will highlight key nodes and explain the codebase structure.</p>
                     <div class="tour-progress-dots" id="tour-progress-dots"></div>
+                    <div class="tour-pro-tip" id="tour-pro-tip">
+                        <span class="tour-pro-tip-icon">💡</span>
+                        <span class="tour-pro-tip-text">Pro tip: Hover over any file or folder to see its details at a glance — no clicking needed.</span>
+                    </div>
                     <div class="tour-actions">
                         <button type="button" class="tour-btn-back" id="tour-btn-back" disabled>Back</button>
                         <button type="button" class="tour-btn-next" id="tour-btn-next">Next</button>
@@ -3028,6 +3009,7 @@ def generate_html(data: dict) -> str:
             const titleEl = document.getElementById('tour-step-title');
             const bodyEl = document.getElementById('tour-step-body');
             const dotsEl = document.getElementById('tour-progress-dots');
+            const proTipEl = document.getElementById('tour-pro-tip');
             const backBtn = document.getElementById('tour-btn-back');
             const nextBtn = document.getElementById('tour-btn-next');
             const exitBtn = document.getElementById('tour-btn-exit');
@@ -3042,22 +3024,19 @@ def generate_html(data: dict) -> str:
             bodyEl.textContent = steps[idx].body || 'Placeholder explanation for this step.';
             var isSidebarStep = steps[idx].sidebarStep === true;
             var allowGraphInteraction = steps[idx].allowGraphInteraction === true;
-            var panelPosition = steps[idx].position || 'bottom-left';
             var overlayEl = document.getElementById('tour-overlay');
             if (overlayEl) overlayEl.classList.toggle('tour-overlay-allow-graph-click', allowGraphInteraction);
             var sidebarEl = document.getElementById('sidebar');
             if (sidebarEl) sidebarEl.classList.toggle('tour-sidebar-highlight', isSidebarStep);
-            var panelEl = document.getElementById('tour-panel');
-            if (panelEl) {
-                panelEl.classList.remove('tour-panel--bottom-left', 'tour-panel--top-right', 'tour-panel--top-left', 'tour-panel--bottom-center', 'tour-panel--bottom-right');
-                panelEl.classList.add('tour-panel--' + panelPosition.replace(/\s/g, '-'));
+            if (proTipEl) {
+                proTipEl.style.display = steps[idx].aiSummaryStep === true ? 'block' : 'none';
             }
             backBtn.style.display = isSidebarStep ? 'none' : '';
             nextBtn.style.display = '';
             if (exitBtn) exitBtn.textContent = 'Exit';
             backBtn.disabled = idx === 0;
             nextBtn.disabled = false;
-            nextBtn.textContent = idx === n - 1 ? 'Finish' : 'Next';
+            nextBtn.textContent = idx === n - 1 ? "I'm ready \u2192" : 'Next';
             dotsEl.innerHTML = '';
             for (let i = 0; i < n; i++) {
                 const dot = document.createElement('div');
@@ -3072,8 +3051,7 @@ def generate_html(data: dict) -> str:
             return fileNodes.slice(0, 5).map((n, i) => ({
                 title: stepTitles[i] || 'Step ' + (i + 1),
                 body: 'Placeholder explanation for this step.',
-                nodeId: n.id,
-                position: 'bottom-left'
+                nodeId: n.id
             }));
         }
         
@@ -3169,6 +3147,9 @@ def generate_html(data: dict) -> str:
         }
 
         function runAiSummaryStepDemo() {
+            // Clear changes highlight from the previous step
+            var changesPanel = document.getElementById('recent-changes-panel');
+            if (changesPanel) changesPanel.classList.remove('tour-changes-highlight');
             // Use the first tour step's nodeId as the demo file
             var firstStep = window._tourSteps && window._tourSteps[0];
             var nodeId = firstStep && firstStep.nodeId;
@@ -3203,20 +3184,18 @@ def generate_html(data: dict) -> str:
                 window._tourSteps = apiSteps.map(s => ({
                     nodeId: (s.nodeId || '').replace(/\\\\/g, '/'),
                     title: s.title || 'Step',
-                    body: s.explanation || s.body || 'Key file in the codebase.',
-                    position: 'bottom-left'
+                    body: s.explanation || s.body || 'Key file in the codebase.'
                 }));
             } else {
                 window._tourSteps = getFallbackTourSteps();
             }
-            window._tourSteps.forEach(function(s) { if (!s.position) s.position = 'bottom-left'; });
             var fileStepIds = window._tourSteps.slice(0, 5).map(function(s) { return s.nodeId; }).filter(Boolean);
             var arrowsNodeId = fileStepIds.length ? getTourNodeWithInboundAndOutbound(fileStepIds) : null;
             window._tourSteps.push(
-                { title: 'Follow the Arrows', body: 'See the arrows on this file? Lines coming IN mean other files depend on it. Lines going OUT mean it imports others. Click around — explore the connections yourself.', nodeId: arrowsNodeId, noDimming: true, allowGraphInteraction: true, position: 'top-right' },
-                { title: 'Size = Importance', body: 'Notice how nodes are different sizes? The bigger the bubble, the more files depend on it. This is called PageRank. Zoom in and out — explore which files matter most in this codebase.', nodeId: null, noDimming: true, allowGraphInteraction: true, sizingStep: true, position: 'top-left' },
-                { title: 'Track Changes Live', body: 'Every time you save a file, Codescape detects what changed. The Git Working Tree shows which files have been modified on your branch. Click \\'AI Summarize\\' to instantly understand what changed and why it matters.', nodeId: null, noDimming: true, allowGraphInteraction: true, changesStep: true, position: 'bottom-right' },
-                { title: 'Understand Any File Instantly', body: 'See those tabs? Click Overview to get a plain-English summary of any file. Impact shows what breaks if you change it. Edit safely warns you before you touch something critical. Read next tells you where to go next.', nodeId: null, noDimming: true, allowGraphInteraction: true, aiSummaryStep: true, position: 'bottom-right' }
+                { title: 'Follow the Arrows', body: 'See the arrows on this file? Lines coming IN mean other files depend on it. Lines going OUT mean it imports others. Click around — explore the connections yourself.', nodeId: arrowsNodeId, noDimming: true, allowGraphInteraction: true },
+                { title: 'Size = Importance', body: 'Notice how nodes are different sizes? The bigger the bubble, the more files depend on it. This is called PageRank. Zoom in and out — explore which files matter most in this codebase.', nodeId: null, noDimming: true, allowGraphInteraction: true, sizingStep: true },
+                { title: 'Track Changes Live', body: 'Every time you save a file, Codescape detects what changed. The Git Working Tree shows which files have been modified on your branch. Click \\'AI Summarize\\' to instantly understand what changed and why it matters.', nodeId: null, noDimming: true, allowGraphInteraction: true, changesStep: true },
+                { title: 'Understand Any File Instantly', body: 'See those tabs? Click Overview to get a plain-English summary of any file. Impact shows what breaks if you change it. Edit safely warns you before you touch something critical. Read next tells you where to go next.', nodeId: null, noDimming: true, allowGraphInteraction: true, aiSummaryStep: true }
             );
             if (!window._tourSteps.length) return;
             window._tourActive = true;
@@ -3244,11 +3223,6 @@ def generate_html(data: dict) -> str:
             if (stepViewEl) stepViewEl.style.display = 'none';
             if (loadingEl) loadingEl.style.display = 'none';
             if (goBtn) { goBtn.style.display = ''; goBtn.disabled = false; }
-            var panelEl = document.getElementById('tour-panel');
-            if (panelEl) {
-                panelEl.classList.remove('tour-panel--top-right', 'tour-panel--top-left', 'tour-panel--bottom-center', 'tour-panel--bottom-right');
-                panelEl.classList.add('tour-panel--bottom-left');
-            }
             window._tourStepsPromise = fetch(window.location.origin + '/api/generate_tour', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
