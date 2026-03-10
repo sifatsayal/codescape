@@ -2451,7 +2451,7 @@ def generate_html(data: dict) -> str:
             if (gitTitleEl && gitListEl) {
                 gitTitleEl.textContent = folderPath ? 'Previous changes (this folder)' : 'Previous changes (from earlier Cmd+S)';
                 const batches = lastChangesData.batches || [];
-                const previousBatches = batches.length > 1 ? batches.slice(0, -1) : [];
+                const previousBatches = batches.length > 1 ? batches.slice(0, -1).reverse() : [];
                 let previousFlat = [];
                 previousBatches.forEach(function(b) {
                     const ts = b.timestamp;
