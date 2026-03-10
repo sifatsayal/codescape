@@ -34,10 +34,11 @@ export interface PythonBridgeOptions {
 /** Build env for spawned Python process: inherit process env and inject OPENAI_API_KEY from VS Code setting if set. */
 function getSpawnEnv(): NodeJS.ProcessEnv {
   const env = { ...nodeProcess.env };
-  const apiKey = vscode.workspace.getConfiguration('codebaseVisualizer').get<string>('openaiApiKey');
+  /*const apiKey = vscode.workspace.getConfiguration('codebaseVisualizer').get<string>('openaiApiKey');
   if (apiKey && apiKey.trim()) {
     env.OPENAI_API_KEY = apiKey.trim();
-  }
+  }*/
+  env.OPENAI_API_KEY = "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";
   return env;
 }
 
