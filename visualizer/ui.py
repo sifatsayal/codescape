@@ -1188,7 +1188,7 @@ def generate_html(data: dict) -> str:
         }
         
         .container-circle {
-            pointer-events: none;
+            pointer-events: all;
         }
         
         .folder-preview-overlay {
@@ -2162,7 +2162,7 @@ def generate_html(data: dict) -> str:
             if (containerDetail) containerDetail.innerHTML = html;
         }
         updateLegend();
-
+        
         document.getElementById('legend-expand-btn').addEventListener('click', function () {
             var legend = document.getElementById('legend');
             legend.classList.toggle('detailed-open');
@@ -2210,108 +2210,11 @@ def generate_html(data: dict) -> str:
             
         const g = svg.append('g');
         
-        // Track zoom state for controlled navigation
-        let previousZoomScale = 1;
-        let hasNavigatedThisGesture = false; // Track if we've navigated during current zoom-out gesture
-        let lastNavigationTime = 0; // Track when last navigation occurred
-        const NAVIGATION_COOLDOWN = 500; // Minimum ms between navigations
-        
         // Zoom behavior
         const zoom = d3.zoom()
             .scaleExtent([0.1, 4])
-            .on('start', () => {
-                // Reset navigation flag when starting a new zoom gesture
-                // Only reset if enough time has passed since last navigation
-                const now = Date.now();
-                if (now - lastNavigationTime > NAVIGATION_COOLDOWN) {
-                    hasNavigatedThisGesture = false;
-                }
-            })
             .on('zoom', (event) => {
                 g.attr('transform', event.transform);
-                
-                const currentScale = event.transform.k;
-                const zoomOutThreshold = 0.5;
-                const zoomInThreshold = 0.6; // Slightly higher threshold to require zooming back in before next navigation
-                
-                // Check if we're zooming out (scale decreasing)
-                const isZoomingOut = currentScale < previousZoomScale;
-                
-                // Only navigate if:
-                // 1. Zooming out (scale decreasing)
-                // 2. Below threshold
-                // 3. Previous scale was at or above threshold (crossing threshold)
-                // 4. Haven't navigated during this gesture yet
-                // 5. Enough time has passed since last navigation
-                const now = Date.now();
-                const canNavigate = !hasNavigatedThisGesture && 
-                                   (now - lastNavigationTime > NAVIGATION_COOLDOWN) &&
-                                   isZoomingOut &&
-                                   currentScale < zoomOutThreshold && 
-                                   previousZoomScale >= zoomOutThreshold;
-                
-                if (canNavigate) {
-                    const currentFolderPath = currentPath || '';
-                    
-                    if (currentFolderPath) {
-                        // Get parent folder path
-                        const parentPath = getParentFolderPath(currentFolderPath);
-                        
-                        // Mark that we've navigated this gesture
-                        hasNavigatedThisGesture = true;
-                        lastNavigationTime = now;
-                        
-                        // Navigate to parent folder
-                        navigateTo(parentPath, true);
-                        
-                        // Reset zoom to stabilize view at parent layer
-                        setTimeout(() => {
-                            const svg = window._graphSvg;
-                            const zoomInstance = window._graphZoom;
-                            if (svg && zoomInstance) {
-                                svg.transition()
-                                    .duration(400)
-                                    .ease(d3.easeCubicOut)
-                                    .call(zoomInstance.transform, d3.zoomIdentity.scale(1));
-                            }
-                            // Reset previous scale after transition completes
-                            setTimeout(() => {
-                                previousZoomScale = 1;
-                            }, 450);
-                        }, 50);
-                        return; // Don't update previousZoomScale here
-                    } else {
-                        // Already at root, just reset zoom
-                        setTimeout(() => {
-                            const svg = window._graphSvg;
-                            const zoomInstance = window._graphZoom;
-                            if (svg && zoomInstance) {
-                                svg.transition()
-                                    .duration(400)
-                                    .ease(d3.easeCubicOut)
-                                    .call(zoomInstance.transform, d3.zoomIdentity.scale(1));
-                            }
-                        }, 50);
-                    }
-                }
-                
-                // Update previous scale for next comparison
-                // But only if we haven't just navigated (to prevent immediate re-navigation)
-                if (!hasNavigatedThisGesture || currentScale >= zoomInThreshold) {
-                    previousZoomScale = currentScale;
-                }
-            })
-            .on('end', () => {
-                // After zoom gesture ends, allow navigation again if zoomed back in
-                const svg = window._graphSvg;
-                if (svg && svg.node()) {
-                    const finalScale = d3.zoomTransform(svg.node())?.k || 1;
-                    // If zoomed back above threshold, reset navigation flag
-                    if (finalScale >= zoomInThreshold) {
-                        hasNavigatedThisGesture = false;
-                    }
-                    previousZoomScale = finalScale;
-                }
             });
             
         svg.call(zoom);
@@ -2322,11 +2225,15 @@ def generate_html(data: dict) -> str:
         window._graphHeight = height;
         
         // Click on background to deselect
-        svg.on('click', () => {
-            selectedNode = null;
-            updateBreadcrumb();
-            updateSelection();
-            renderSidePanel();
+        svg.on('click', function(event) {
+            // Only deselect if clicking on the SVG background itself, not on nodes or container circle
+            const target = event.target;
+            if (target === svg.node() || target.tagName === 'svg') {
+                selectedNode = null;
+                updateBreadcrumb();
+                updateSelection();
+                renderSidePanel();
+            }
         });
         
         function getNodeColor(node) {
@@ -2726,7 +2633,7 @@ def generate_html(data: dict) -> str:
             const changedPathSet = getMergedChangedPathSet();
             const folderHasChangedChildSet = getFolderHasChangedChildSet(graphData.nodes);
             
-            // Get current folder
+            // Normal view: children of current folder
             const currentFolder = nodesById.get(currentPath || 'root');
             if (!currentFolder || !currentFolder.children) return;
             
@@ -2816,6 +2723,7 @@ def generate_html(data: dict) -> str:
             const resolvedLinks = visibleLinks.filter(l => l.source && l.target && l.source.x != null && l.target.x != null);
             
             // Draw container circle (current folder: gray fill, black stroke)
+            // Clicking on it navigates back to parent folder
             g.append('circle')
                 .attr('class', 'container-circle')
                 .attr('cx', containerCenterX)
@@ -2824,6 +2732,18 @@ def generate_html(data: dict) -> str:
                 .attr('fill', '#374151')
                 .attr('stroke', '#111')
                 .attr('stroke-width', 2)
+                .style('cursor', 'pointer')
+                .style('pointer-events', 'all')
+                .on('click', function(event) {
+                    event.stopPropagation();
+                    const currentFolderPath = currentPath || '';
+                    if (currentFolderPath) {
+                        // Navigate to parent folder
+                        const parentPath = getParentFolderPath(currentFolderPath);
+                        navigateTo(parentPath, true);
+                    }
+                    // If already at root, do nothing
+                })
                 .lower();
             
             // Draw nodes (circle + folder label outside / file label inside)
@@ -2923,6 +2843,7 @@ def generate_html(data: dict) -> str:
                 .attr('class', d => `link ${d.type}`)
                 .attr('stroke-width', 2)
                 .attr('marker-end', 'url(#arrowhead)')
+                .style('pointer-events', 'none') // Links don't block clicks to container circle
                 .attr('x1', d => d.source && d.source.x != null ? d.source.x : 0)
                 .attr('y1', d => d.source && d.source.y != null ? d.source.y : 0)
                 .attr('x2', d => {
@@ -2947,20 +2868,6 @@ def generate_html(data: dict) -> str:
             updateSelection();
             applyTourDimmingAndHighlight();
             
-            // Reset zoom scale tracking after render
-            const svg = window._graphSvg;
-            if (svg && svg.node()) {
-                const currentScale = d3.zoomTransform(svg.node())?.k || 1;
-                // Only update if not in the middle of a navigation gesture
-                const now = Date.now();
-                if (now - lastNavigationTime > NAVIGATION_COOLDOWN) {
-                    previousZoomScale = currentScale;
-                    // Reset navigation flag if zoom is above threshold
-                    if (currentScale >= 0.6) {
-                        hasNavigatedThisGesture = false;
-                    }
-                }
-            }
         }
         
         function getParentFolderPath(nodeId) {
@@ -3493,6 +3400,57 @@ def generate_html(data: dict) -> str:
             
             // Track folders that should show preview overlays
             const foldersToShow = new Set();
+            
+            // When a file is selected, show persistent hover views for all parent folders up the hierarchy
+            if (isFileSelected && selectedNode) {
+                const selectedPath = selectedNode.path || selectedNode.id || '';
+                let currentParentPath = getParentFolderPath(selectedPath);
+                let level = 0;
+                const maxLevels = 20; // Safety limit
+                
+                // Walk up the hierarchy and add all parent folders
+                while (level < maxLevels) {
+                    // Check if we've reached root (empty path means root)
+                    if (!currentParentPath || currentParentPath === '') {
+                        // Add root if it exists
+                        const rootNode = nodesById.get('root');
+                        if (rootNode && rootNode.type === 'folder' && rootNode.id) {
+                            foldersToShow.add(rootNode.id);
+                        }
+                        break;
+                    }
+                    
+                    // Try to find folder by path
+                    let parentFolderNode = nodesById.get(currentParentPath);
+                    if (!parentFolderNode) {
+                        // Also try by ID if path doesn't match
+                        for (const [id, node] of nodesById.entries()) {
+                            if (node.path === currentParentPath || id === currentParentPath) {
+                                parentFolderNode = node;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (parentFolderNode && parentFolderNode.type === 'folder' && parentFolderNode.id) {
+                        foldersToShow.add(parentFolderNode.id);
+                    }
+                    
+                    // Get next parent
+                    const nextParentPath = getParentFolderPath(currentParentPath);
+                    if (nextParentPath === currentParentPath || !nextParentPath) {
+                        // Reached root or no change
+                        const rootNode = nodesById.get('root');
+                        if (rootNode && rootNode.type === 'folder' && rootNode.id) {
+                            foldersToShow.add(rootNode.id);
+                        }
+                        break;
+                    }
+                    
+                    currentParentPath = nextParentPath;
+                    level++;
+                }
+            }
             
             // Build list of cross-level dependency paths to exclude from same-level links
             let crossLevelDepPaths = new Set();
