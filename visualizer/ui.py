@@ -796,6 +796,20 @@ def generate_html(data: dict) -> str:
             padding-top: 16px;
             border-top: 1px solid rgba(100, 100, 150, 0.2);
         }
+        .ai-summary-section.tour-ai-summary-highlight {
+            border: 3px solid #06b6d4;
+            border-radius: 10px;
+            padding: 14px;
+            margin-top: 20px;
+            margin-left: -3px;
+            margin-right: -3px;
+            box-shadow: 0 0 0 3px #06b6d4, 0 0 20px #06b6d4;
+            animation: tour-ai-summary-glow 1.2s ease-in-out infinite;
+        }
+        @keyframes tour-ai-summary-glow {
+            0%, 100% { box-shadow: 0 0 0 3px #06b6d4, 0 0 20px #06b6d4; border-color: #06b6d4; }
+            50% { box-shadow: 0 0 0 4px #06b6d4, 0 0 32px #06b6d4, 0 0 48px rgba(6, 182, 212, 0.5); border-color: #22d3ee; }
+        }
         .ai-summary-section .sidebar-title {
             margin-bottom: 10px;
         }
@@ -1421,6 +1435,8 @@ def generate_html(data: dict) -> str:
         #tour-panel {
             position: fixed;
             left: 24px;
+            right: auto;
+            top: auto;
             bottom: 72px;
             min-width: 380px;
             width: 380px;
@@ -1431,12 +1447,46 @@ def generate_html(data: dict) -> str:
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
             transform: translateY(120%);
             opacity: 0;
-            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+            transition:
+                left 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+                right 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+                top 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+                bottom 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+                transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+                opacity 0.3s ease;
             z-index: 51;
         }
         #tour-overlay.active #tour-panel {
             transform: translateY(0);
             opacity: 1;
+        }
+        #tour-panel.tour-panel--bottom-left {
+            left: 24px;
+            right: auto;
+            top: auto;
+            bottom: 72px;
+        }
+        #tour-panel.tour-panel--top-right {
+            left: auto;
+            right: 24px;
+            top: 72px;
+            bottom: auto;
+        }
+        #tour-panel.tour-panel--top-left {
+            left: 24px;
+            right: auto;
+            top: 72px;
+            bottom: auto;
+        }
+        #tour-panel.tour-panel--bottom-center {
+            left: 50%;
+            right: auto;
+            top: auto;
+            bottom: 72px;
+            transform: translate(-50%, 120%);
+        }
+        #tour-overlay.active #tour-panel.tour-panel--bottom-center {
+            transform: translate(-50%, 0);
         }
         #tour-panel-inner {
             background: rgba(15, 15, 25, 0.98);
@@ -2930,7 +2980,7 @@ def generate_html(data: dict) -> str:
                 return;
             }
             const step = window._tourSteps[window._tourStepIndex];
-            if (step.zoomOut || step.sidebarStep || step.noDimming || step.sizingStep || !step.nodeId) {
+            if (step.zoomOut || step.sidebarStep || step.noDimming || step.sizingStep || step.aiSummaryStep || !step.nodeId) {
                 gRef.selectAll('.node').attr('opacity', 1).classed('tour-dimmed', false);
                 return;
             }
@@ -2974,10 +3024,16 @@ def generate_html(data: dict) -> str:
             bodyEl.textContent = steps[idx].body || 'Placeholder explanation for this step.';
             var isSidebarStep = steps[idx].sidebarStep === true;
             var allowGraphInteraction = steps[idx].allowGraphInteraction === true;
+            var panelPosition = steps[idx].position || 'bottom-left';
             var overlayEl = document.getElementById('tour-overlay');
             if (overlayEl) overlayEl.classList.toggle('tour-overlay-allow-graph-click', allowGraphInteraction);
             var sidebarEl = document.getElementById('sidebar');
             if (sidebarEl) sidebarEl.classList.toggle('tour-sidebar-highlight', isSidebarStep);
+            var panelEl = document.getElementById('tour-panel');
+            if (panelEl) {
+                panelEl.classList.remove('tour-panel--bottom-left', 'tour-panel--top-right', 'tour-panel--top-left', 'tour-panel--bottom-center');
+                panelEl.classList.add('tour-panel--' + panelPosition.replace(/\s/g, '-'));
+            }
             backBtn.style.display = isSidebarStep ? 'none' : '';
             nextBtn.style.display = '';
             if (exitBtn) exitBtn.textContent = 'Exit';
@@ -2998,7 +3054,8 @@ def generate_html(data: dict) -> str:
             return fileNodes.slice(0, 5).map((n, i) => ({
                 title: stepTitles[i] || 'Step ' + (i + 1),
                 body: 'Placeholder explanation for this step.',
-                nodeId: n.id
+                nodeId: n.id,
+                position: 'bottom-left'
             }));
         }
         
@@ -3068,6 +3125,32 @@ def generate_html(data: dict) -> str:
             updateSelection();
             updateSidebarNav();
         }
+
+        function runAiSummaryStepDemo() {
+            // Use the first tour step's nodeId as the demo file
+            var firstStep = window._tourSteps && window._tourSteps[0];
+            var nodeId = firstStep && firstStep.nodeId;
+            if (!nodeId) return;
+            var node = nodesById.get(nodeId) || graphData.nodes.find(function(n) { return (n.id || n.path) === nodeId; });
+            if (!node) return;
+            selectedNode = node;
+            pushHistory(node.id || node.path || nodeId);
+            var parts = (node.path || node.id || nodeId).split('/');
+            parts.pop();
+            currentPath = parts.length ? parts.join('/') : '';
+            updateBreadcrumb();
+            renderSidePanel();
+            updateSelection();
+            updateSidebarNav();
+            setTimeout(function() {
+                var section = document.querySelector('#details-panel .ai-summary-section');
+                if (!section) return;
+                section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                section.classList.add('tour-ai-summary-highlight');
+                var overviewTab = section.querySelector('.ai-summary-tab[data-mode=\"overview\"]');
+                if (overviewTab) overviewTab.click();
+            }, 500);
+        }
         
         function startTourWithSteps(apiSteps) {
             const introEl = document.getElementById('tour-intro');
@@ -3078,18 +3161,19 @@ def generate_html(data: dict) -> str:
                 window._tourSteps = apiSteps.map(s => ({
                     nodeId: (s.nodeId || '').replace(/\\\\/g, '/'),
                     title: s.title || 'Step',
-                    body: s.explanation || s.body || 'Key file in the codebase.'
+                    body: s.explanation || s.body || 'Key file in the codebase.',
+                    position: 'bottom-left'
                 }));
             } else {
                 window._tourSteps = getFallbackTourSteps();
             }
+            window._tourSteps.forEach(function(s) { if (!s.position) s.position = 'bottom-left'; });
             var fileStepIds = window._tourSteps.slice(0, 5).map(function(s) { return s.nodeId; }).filter(Boolean);
             var arrowsNodeId = fileStepIds.length ? getTourNodeWithInboundAndOutbound(fileStepIds) : null;
             window._tourSteps.push(
-                { title: 'Follow the Arrows', body: 'See the arrows on this file? Lines coming IN mean other files depend on it. Lines going OUT mean it imports others. Click around — explore the connections yourself.', nodeId: arrowsNodeId, noDimming: true, allowGraphInteraction: true },
-                { title: 'Size = Importance', body: 'Notice how nodes are different sizes? The bigger the bubble, the more files depend on it. This is called PageRank. Zoom in and out — explore which files matter most in this codebase.', nodeId: null, noDimming: true, allowGraphInteraction: true, sizingStep: true },
-                { title: 'Zoom out', body: 'Scroll out to see the big picture — folders collapse into single bubbles. Click any folder bubble to drill in and explore its files.', nodeId: null, zoomOut: true },
-                { title: 'Your Toolkit', body: 'Click any file and the sidebar shows everything about it — language, lines of code, and dependencies. Use the AI Summary tabs to get an instant overview, understand how it works, see what breaks if you change it, and find out what to read next.', nodeId: null, sidebarStep: true }
+                { title: 'Follow the Arrows', body: 'See the arrows on this file? Lines coming IN mean other files depend on it. Lines going OUT mean it imports others. Click around — explore the connections yourself.', nodeId: arrowsNodeId, noDimming: true, allowGraphInteraction: true, position: 'top-right' },
+                { title: 'Size = Importance', body: 'Notice how nodes are different sizes? The bigger the bubble, the more files depend on it. This is called PageRank. Zoom in and out — explore which files matter most in this codebase.', nodeId: null, noDimming: true, allowGraphInteraction: true, sizingStep: true, position: 'top-left' },
+                { title: 'Understand Any File Instantly', body: 'See those tabs? Click Overview to get a plain-English summary of any file. Impact shows what breaks if you change it. Edit safely warns you before you touch something critical. Read next tells you where to go next.', nodeId: null, noDimming: true, allowGraphInteraction: true, aiSummaryStep: true, position: 'bottom-left' }
             );
             if (!window._tourSteps.length) return;
             window._tourActive = true;
@@ -3117,6 +3201,11 @@ def generate_html(data: dict) -> str:
             if (stepViewEl) stepViewEl.style.display = 'none';
             if (loadingEl) loadingEl.style.display = 'none';
             if (goBtn) { goBtn.style.display = ''; goBtn.disabled = false; }
+            var panelEl = document.getElementById('tour-panel');
+            if (panelEl) {
+                panelEl.classList.remove('tour-panel--top-right', 'tour-panel--top-left', 'tour-panel--bottom-center');
+                panelEl.classList.add('tour-panel--bottom-left');
+            }
             window._tourStepsPromise = fetch(window.location.origin + '/api/generate_tour', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -3156,6 +3245,9 @@ def generate_html(data: dict) -> str:
             if (overlayEl) overlayEl.classList.remove('tour-overlay-allow-graph-click');
             const sidebarEl = document.getElementById('sidebar');
             if (sidebarEl) sidebarEl.classList.remove('tour-sidebar-highlight');
+            document.querySelectorAll('.ai-summary-section.tour-ai-summary-highlight').forEach(function(el) {
+                el.classList.remove('tour-ai-summary-highlight');
+            });
             const introEl = document.getElementById('tour-intro');
             const stepViewEl = document.getElementById('tour-step-view');
             if (introEl) introEl.style.display = 'none';
@@ -3189,6 +3281,8 @@ def generate_html(data: dict) -> str:
                     deselectAndZoomOutToRoot();
                 } else if (step.sidebarStep) {
                     // No navigation, no zoom; sidebar highlight is applied in updateTourUI
+                } else if (step.aiSummaryStep) {
+                    runAiSummaryStepDemo();
                 } else if (step.nodeId) {
                     const parentPath = getParentFolderPath(step.nodeId);
                     navigateTo(parentPath || '', true);
@@ -3215,6 +3309,8 @@ def generate_html(data: dict) -> str:
                     deselectAndZoomOutToRoot();
                 } else if (step.sidebarStep) {
                     // No navigation; sidebar highlight is removed in updateTourUI when we leave this step
+                } else if (step.aiSummaryStep) {
+                    runAiSummaryStepDemo();
                 } else if (step.nodeId) {
                     const parentPath = getParentFolderPath(step.nodeId);
                     navigateTo(parentPath || '', true);
