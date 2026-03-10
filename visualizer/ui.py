@@ -1188,7 +1188,7 @@ def generate_html(data: dict) -> str:
         }
         
         .container-circle {
-            pointer-events: none;
+            pointer-events: all;
         }
         
         .folder-preview-overlay {
@@ -2162,7 +2162,7 @@ def generate_html(data: dict) -> str:
             if (containerDetail) containerDetail.innerHTML = html;
         }
         updateLegend();
-
+        
         document.getElementById('legend-expand-btn').addEventListener('click', function () {
             var legend = document.getElementById('legend');
             legend.classList.toggle('detailed-open');
@@ -2210,108 +2210,11 @@ def generate_html(data: dict) -> str:
             
         const g = svg.append('g');
         
-        // Track zoom state for controlled navigation
-        let previousZoomScale = 1;
-        let hasNavigatedThisGesture = false; // Track if we've navigated during current zoom-out gesture
-        let lastNavigationTime = 0; // Track when last navigation occurred
-        const NAVIGATION_COOLDOWN = 500; // Minimum ms between navigations
-        
         // Zoom behavior
         const zoom = d3.zoom()
             .scaleExtent([0.1, 4])
-            .on('start', () => {
-                // Reset navigation flag when starting a new zoom gesture
-                // Only reset if enough time has passed since last navigation
-                const now = Date.now();
-                if (now - lastNavigationTime > NAVIGATION_COOLDOWN) {
-                    hasNavigatedThisGesture = false;
-                }
-            })
             .on('zoom', (event) => {
                 g.attr('transform', event.transform);
-                
-                const currentScale = event.transform.k;
-                const zoomOutThreshold = 0.5;
-                const zoomInThreshold = 0.6; // Slightly higher threshold to require zooming back in before next navigation
-                
-                // Check if we're zooming out (scale decreasing)
-                const isZoomingOut = currentScale < previousZoomScale;
-                
-                // Only navigate if:
-                // 1. Zooming out (scale decreasing)
-                // 2. Below threshold
-                // 3. Previous scale was at or above threshold (crossing threshold)
-                // 4. Haven't navigated during this gesture yet
-                // 5. Enough time has passed since last navigation
-                const now = Date.now();
-                const canNavigate = !hasNavigatedThisGesture && 
-                                   (now - lastNavigationTime > NAVIGATION_COOLDOWN) &&
-                                   isZoomingOut &&
-                                   currentScale < zoomOutThreshold && 
-                                   previousZoomScale >= zoomOutThreshold;
-                
-                if (canNavigate) {
-                    const currentFolderPath = currentPath || '';
-                    
-                    if (currentFolderPath) {
-                        // Get parent folder path
-                        const parentPath = getParentFolderPath(currentFolderPath);
-                        
-                        // Mark that we've navigated this gesture
-                        hasNavigatedThisGesture = true;
-                        lastNavigationTime = now;
-                        
-                        // Navigate to parent folder
-                        navigateTo(parentPath, true);
-                        
-                        // Reset zoom to stabilize view at parent layer
-                        setTimeout(() => {
-                            const svg = window._graphSvg;
-                            const zoomInstance = window._graphZoom;
-                            if (svg && zoomInstance) {
-                                svg.transition()
-                                    .duration(400)
-                                    .ease(d3.easeCubicOut)
-                                    .call(zoomInstance.transform, d3.zoomIdentity.scale(1));
-                            }
-                            // Reset previous scale after transition completes
-                            setTimeout(() => {
-                                previousZoomScale = 1;
-                            }, 450);
-                        }, 50);
-                        return; // Don't update previousZoomScale here
-                    } else {
-                        // Already at root, just reset zoom
-                        setTimeout(() => {
-                            const svg = window._graphSvg;
-                            const zoomInstance = window._graphZoom;
-                            if (svg && zoomInstance) {
-                                svg.transition()
-                                    .duration(400)
-                                    .ease(d3.easeCubicOut)
-                                    .call(zoomInstance.transform, d3.zoomIdentity.scale(1));
-                            }
-                        }, 50);
-                    }
-                }
-                
-                // Update previous scale for next comparison
-                // But only if we haven't just navigated (to prevent immediate re-navigation)
-                if (!hasNavigatedThisGesture || currentScale >= zoomInThreshold) {
-                    previousZoomScale = currentScale;
-                }
-            })
-            .on('end', () => {
-                // After zoom gesture ends, allow navigation again if zoomed back in
-                const svg = window._graphSvg;
-                if (svg && svg.node()) {
-                    const finalScale = d3.zoomTransform(svg.node())?.k || 1;
-                    // If zoomed back above threshold, reset navigation flag
-                    if (finalScale >= zoomInThreshold) {
-                        hasNavigatedThisGesture = false;
-                    }
-                    previousZoomScale = finalScale;
-                }
             });
             
         svg.call(zoom);
@@ -2322,11 +2225,15 @@ def generate_html(data: dict) -> str:
         window._graphHeight = height;
         
         // Click on background to deselect
-        svg.on('click', () => {
-            selectedNode = null;
-            updateBreadcrumb();
-            updateSelection();
-            renderSidePanel();
+        svg.on('click', function(event) {
+            // Only deselect if clicking on the SVG background itself, not on nodes or container circle
+            const target = event.target;
+            if (target === svg.node() || target.tagName === 'svg') {
+                selectedNode = null;
+                updateBreadcrumb();
+                updateSelection();
+                renderSidePanel();
+            }
         });
         
         function getNodeColor(node) {
@@ -2726,7 +2633,7 @@ def generate_html(data: dict) -> str:
             const changedPathSet = getMergedChangedPathSet();
             const folderHasChangedChildSet = getFolderHasChangedChildSet(graphData.nodes);
             
-            // Get current folder
+            // Normal view: children of current folder
             const currentFolder = nodesById.get(currentPath || 'root');
             if (!currentFolder || !currentFolder.children) return;
             
@@ -2816,6 +2723,7 @@ def generate_html(data: dict) -> str:
             const resolvedLinks = visibleLinks.filter(l => l.source && l.target && l.source.x != null && l.target.x != null);
             
             // Draw container circle (current folder: gray fill, black stroke)
+            // Clicking on it navigates back to parent folder
             g.append('circle')
                 .attr('class', 'container-circle')
                 .attr('cx', containerCenterX)
@@ -2824,6 +2732,18 @@ def generate_html(data: dict) -> str:
                 .attr('fill', '#374151')
                 .attr('stroke', '#111')
                 .attr('stroke-width', 2)
+                .style('cursor', 'pointer')
+                .style('pointer-events', 'all')
+                .on('click', function(event) {
+                    event.stopPropagation();
+                    const currentFolderPath = currentPath || '';
+                    if (currentFolderPath) {
+                        // Navigate to parent folder
+                        const parentPath = getParentFolderPath(currentFolderPath);
+                        navigateTo(parentPath, true);
+                    }
+                    // If already at root, do nothing
+                })
                 .lower();
             
             // Draw nodes (circle + folder label outside / file label inside)
@@ -2923,6 +2843,7 @@ def generate_html(data: dict) -> str:
                 .attr('class', d => `link ${d.type}`)
                 .attr('stroke-width', 2)
                 .attr('marker-end', 'url(#arrowhead)')
+                .style('pointer-events', 'none') // Links don't block clicks to container circle
                 .attr('x1', d => d.source && d.source.x != null ? d.source.x : 0)
                 .attr('y1', d => d.source && d.source.y != null ? d.source.y : 0)
                 .attr('x2', d => {
@@ -2947,20 +2868,6 @@ def generate_html(data: dict) -> str:
             updateSelection();
             applyTourDimmingAndHighlight();
             
-            // Reset zoom scale tracking after render
-            const svg = window._graphSvg;
-            if (svg && svg.node()) {
-                const currentScale = d3.zoomTransform(svg.node())?.k || 1;
-                // Only update if not in the middle of a navigation gesture
-                const now = Date.now();
-                if (now - lastNavigationTime > NAVIGATION_COOLDOWN) {
-                    previousZoomScale = currentScale;
-                    // Reset navigation flag if zoom is above threshold
-                    if (currentScale >= 0.6) {
-                        hasNavigatedThisGesture = false;
-                    }
-                }
-            }
         }
         
         function getParentFolderPath(nodeId) {
@@ -3387,6 +3294,84 @@ def generate_html(data: dict) -> str:
             return relativePath || './' + targetParts[targetParts.length - 1];
         }
         
+        function getOrCreateColoredArrowhead(color) {
+            // Create a unique marker ID based on color
+            const colorId = color.replace('#', '').replace(/[^a-z0-9]/gi, '');
+            const markerId = `arrowhead-colored-${colorId}`;
+            
+            // Check if marker already exists
+            const svg = window._graphSvg;
+            if (!svg) return 'url(#arrowhead-cross-level)';
+            
+            const existingMarker = svg.select(`#${markerId}`);
+            if (!existingMarker.empty()) {
+                return `url(#${markerId})`;
+            }
+            
+            // Create new colored marker
+            const defs = svg.select('defs');
+            defs.append('marker')
+                .attr('id', markerId)
+                .attr('markerWidth', 7)
+                .attr('markerHeight', 4.9)
+                .attr('refX', 7)
+                .attr('refY', 2.45)
+                .attr('orient', 'auto')
+                .append('polygon')
+                .attr('points', '0 0, 7 2.45, 0 4.9')
+                .attr('fill', color);
+            
+            return `url(#${markerId})`;
+        }
+        
+        // Helper function to show folder preview overlay persistently
+        function showFolderPreviewOverlay(folderNode, g) {
+            if (!folderNode || !folderNode.children || folderNode.children.length === 0) return;
+            if (!g) return;
+            
+            try {
+                const folderElement = g.select(`.node[data-id="${folderNode.id}"]`);
+                if (folderElement.empty()) return;
+                
+                // Check if overlay already exists
+                if (!folderElement.select('.folder-preview-overlay-persistent').empty()) return;
+                
+                const children = folderNode.children.map(id => nodesById.get(id)).filter(Boolean);
+                if (children.length === 0) return;
+                
+                // Get folder radius - use from node data or calculate
+                const folderR = folderNode.r || getPackRadius(folderNode);
+                const size = Math.max(2 * folderR - 24, 24);
+                const root = { children: children.map(n => ({ ...n, value: 1 })) };
+                const hierarchy = d3.hierarchy(root, x => (x === root ? x.children : null)).sum(x => x.value ?? 0);
+                d3.pack().size([size, size]).padding(2)(hierarchy);
+                const center = size / 2;
+                const clipId = 'folder-clip-persistent-' + String(folderNode.id || 'root').replace(/[^a-z0-9-_]/gi, '_');
+                const defs = d3.select('#graph').select('defs');
+                if (!defs.empty() && defs.select('#' + clipId).empty()) {
+                    defs.append('clipPath').attr('id', clipId).append('circle').attr('r', folderR).attr('cx', 0).attr('cy', 0);
+                }
+                const overlay = folderElement.append('g')
+                    .attr('class', 'folder-preview-overlay-persistent')
+                    .attr('clip-path', 'url(#' + clipId + ')');
+                if (hierarchy.children) {
+                    hierarchy.children.forEach(c => {
+                        const nd = c.data;
+                        const fill = nd.type === 'folder' ? '#374151' : getNodeColor(nd);
+                        overlay.append('circle')
+                            .attr('class', 'folder-preview-dot')
+                            .attr('cx', c.x - center)
+                            .attr('cy', c.y - center)
+                            .attr('r', Math.max(c.r, 3))
+                            .style('fill', fill)
+                            .attr('stroke', 'none');
+                    });
+                }
+            } catch (e) {
+                console.error('Error showing folder preview overlay:', e);
+            }
+        }
+        
         function updateSelection() {
             const g = window._graphG;
             if (!g) return;
@@ -3400,12 +3385,137 @@ def generate_html(data: dict) -> str:
             g.selectAll('.outside-node').remove();
             g.selectAll('.link-cross-level').remove();
             
-            // Update same-level links (lines)
+            // Remove all persistent folder preview overlays
+            g.selectAll('.folder-preview-overlay-persistent').remove();
+            // Remove persistent nested file circles
+            g.selectAll('.nested-file-circle-persistent').remove();
+            try {
+                const defs = d3.select('#graph').select('defs');
+                if (!defs.empty()) {
+                    defs.selectAll('clipPath[id^="folder-clip-persistent-"]').remove();
+                }
+            } catch (e) {
+                // Ignore errors in cleanup
+            }
+            
+            // Track folders that should show preview overlays
+            const foldersToShow = new Set();
+            
+            // When a file is selected, show persistent hover views for all parent folders up the hierarchy
+            if (isFileSelected && selectedNode) {
+                const selectedPath = selectedNode.path || selectedNode.id || '';
+                let currentParentPath = getParentFolderPath(selectedPath);
+                let level = 0;
+                const maxLevels = 20; // Safety limit
+                
+                // Walk up the hierarchy and add all parent folders
+                while (level < maxLevels) {
+                    // Check if we've reached root (empty path means root)
+                    if (!currentParentPath || currentParentPath === '') {
+                        // Add root if it exists
+                        const rootNode = nodesById.get('root');
+                        if (rootNode && rootNode.type === 'folder' && rootNode.id) {
+                            foldersToShow.add(rootNode.id);
+                        }
+                        break;
+                    }
+                    
+                    // Try to find folder by path
+                    let parentFolderNode = nodesById.get(currentParentPath);
+                    if (!parentFolderNode) {
+                        // Also try by ID if path doesn't match
+                        for (const [id, node] of nodesById.entries()) {
+                            if (node.path === currentParentPath || id === currentParentPath) {
+                                parentFolderNode = node;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (parentFolderNode && parentFolderNode.type === 'folder' && parentFolderNode.id) {
+                        foldersToShow.add(parentFolderNode.id);
+                    }
+                    
+                    // Get next parent
+                    const nextParentPath = getParentFolderPath(currentParentPath);
+                    if (nextParentPath === currentParentPath || !nextParentPath) {
+                        // Reached root or no change
+                        const rootNode = nodesById.get('root');
+                        if (rootNode && rootNode.type === 'folder' && rootNode.id) {
+                            foldersToShow.add(rootNode.id);
+                        }
+                        break;
+                    }
+                    
+                    currentParentPath = nextParentPath;
+                    level++;
+                }
+            }
+            
+            // Build list of cross-level dependency paths to exclude from same-level links
+            let crossLevelDepPaths = new Set();
+            let crossLevelDepNodeIds = new Set();
+            if (isFileSelected && selectedNode) {
+                const currentFolderPath = (selectedNode.path || '').split('/').slice(0, -1).join('/');
+                const dependencies = selectedNode.dependencies || [];
+                const dependents = selectedNode.dependents || [];
+                
+                // Mark cross-level dependencies (not in same folder)
+                dependencies.forEach(depPath => {
+                    const depParent = getParentFolderPath(depPath);
+                    if (depParent !== currentFolderPath) {
+                        crossLevelDepPaths.add(depPath);
+                        // Also add the node ID if we can find it
+                        const depNode = nodesById.get(depPath);
+                        if (depNode && depNode.id) {
+                            crossLevelDepNodeIds.add(depNode.id);
+                        }
+                    }
+                });
+                dependents.forEach(depPath => {
+                    const depParent = getParentFolderPath(depPath);
+                    if (depParent !== currentFolderPath) {
+                        crossLevelDepPaths.add(depPath);
+                        // Also add the node ID if we can find it
+                        const depNode = nodesById.get(depPath);
+                        if (depNode && depNode.id) {
+                            crossLevelDepNodeIds.add(depNode.id);
+                        }
+                    }
+                });
+            }
+            
+            // Update same-level links (lines) - hide cross-level ones, they'll be drawn separately
             g.selectAll('.links .link')
                 .classed('visible', d => {
                     if (!sid || !isFileSelected) return false;
                     const sourceId = typeof d.source === 'object' && d.source !== null ? d.source.id : d.source;
                     const targetId = typeof d.target === 'object' && d.target !== null ? d.target.id : d.target;
+                    const sourceNode = typeof d.source === 'object' ? d.source : nodesById.get(sourceId);
+                    const targetNode = typeof d.target === 'object' ? d.target : nodesById.get(targetId);
+                    
+                    // Hide if this is a cross-level dependency
+                    // Check by path, ID, or normalized path
+                    const targetPath = targetNode ? (targetNode.path || targetNode.id || '') : '';
+                    const sourcePath = sourceNode ? (sourceNode.path || sourceNode.id || '') : '';
+                    const targetPathNorm = targetPath.replace(/\\\\/g, '/');
+                    const sourcePathNorm = sourcePath.replace(/\\\\/g, '/');
+                    
+                    if (sourceId === sid && targetNode && 
+                        (crossLevelDepPaths.has(targetPath) || 
+                         crossLevelDepPaths.has(targetPathNorm) ||
+                         crossLevelDepNodeIds.has(targetId) ||
+                         crossLevelDepPaths.has(targetNode.id))) {
+                        return false;
+                    }
+                    if (targetId === sid && sourceNode && 
+                        (crossLevelDepPaths.has(sourcePath) || 
+                         crossLevelDepPaths.has(sourcePathNorm) ||
+                         crossLevelDepNodeIds.has(sourceId) ||
+                         crossLevelDepPaths.has(sourceNode.id))) {
+                        return false;
+                    }
+                    
                     return sourceId === sid || targetId === sid;
                 })
                 .classed('inbound', d => isFileSelected && (typeof d.target === 'object' && d.target !== null ? d.target.id : d.target) === sid)
@@ -3420,11 +3530,60 @@ def generate_html(data: dict) -> str:
                     return 'url(#arrowhead)';
                 });
             
-            // Show cross-level dependencies with outside nodes and purple arrows
+            // Show cross-level dependencies - either as direct connections or external nodes
             if (isFileSelected && selectedNode) {
                 const currentFolderPath = (selectedNode.path || '').split('/').slice(0, -1).join('/');
                 const dependencies = selectedNode.dependencies || [];
                 const dependents = selectedNode.dependents || [];
+                
+                // Get visible nodes in current layer (for checking if dependency exists in layer)
+                const currentFolder = nodesById.get(currentPath || 'root');
+                const visibleNodeIds = currentFolder && currentFolder.children ? new Set(currentFolder.children) : new Set();
+                
+                // Build a map of all nodes visible in current layer (including nested)
+                const visibleNodesMap = new Map();
+                const allVisibleNodes = [];
+                
+                // Function to recursively collect all nodes in visible folders
+                function collectVisibleNodes(nodeId) {
+                    const node = nodesById.get(nodeId);
+                    if (!node) return;
+                    
+                    // Add this node to map with multiple key formats
+                    if (node.id) {
+                        visibleNodesMap.set(node.id, node);
+                        const normalizedId = node.id.replace(/\\\\/g, '/');
+                        visibleNodesMap.set(normalizedId, node);
+                    }
+                    if (node.path) {
+                        visibleNodesMap.set(node.path, node);
+                        const normalizedPath = node.path.replace(/\\\\/g, '/');
+                        visibleNodesMap.set(normalizedPath, node);
+                        
+                        // Add path segments for flexible matching (e.g., "settings/index.js")
+                        const pathParts = normalizedPath.split('/');
+                        // Add last 2-3 segments for matching nested files
+                        for (let i = Math.max(0, pathParts.length - 3); i < pathParts.length; i++) {
+                            const segment = pathParts.slice(i).join('/');
+                            if (segment && segment !== normalizedPath && segment.length > 0) {
+                                visibleNodesMap.set(segment, node);
+                            }
+                        }
+                    }
+                    allVisibleNodes.push(node);
+                    
+                    // If it's a folder with children, recursively collect children
+                    if (node.type === 'folder' && node.children) {
+                        node.children.forEach(childId => {
+                            collectVisibleNodes(childId);
+                        });
+                    }
+                }
+                
+                // Collect all visible nodes starting from direct children
+                visibleNodeIds.forEach(nodeId => {
+                    collectVisibleNodes(nodeId);
+                });
                 
                 // Get container dimensions
                 const containerCx = window._containerCenterX;
@@ -3432,16 +3591,42 @@ def generate_html(data: dict) -> str:
                 const containerR = window._containerR;
                 
                 if (containerCx && containerCy && containerR) {
-                    // Find cross-level dependencies (outbound)
+                    // Find cross-level dependencies (outbound) - dependencies not in current folder
                     const crossLevelDeps = dependencies.filter(depPath => {
                         const depParent = getParentFolderPath(depPath);
                         return depParent !== currentFolderPath;
                     });
                     
-                    // Find cross-level dependents (inbound)
+                    // Find cross-level dependents (inbound) - dependents not in current folder
                     const crossLevelDependents = dependents.filter(depPath => {
                         const depParent = getParentFolderPath(depPath);
                         return depParent !== currentFolderPath;
+                    });
+                    
+                    // Collect folders for ALL dependencies that point to files inside visible folders
+                    dependencies.forEach(depPath => {
+                        try {
+                            const depParentFolder = getParentFolderPath(depPath);
+                            const depParentFolderNode = visibleNodesMap.get(depParentFolder) || nodesById.get(depParentFolder);
+                            if (depParentFolderNode && depParentFolderNode.type === 'folder' && depParentFolderNode.id) {
+                                foldersToShow.add(depParentFolderNode.id);
+                            }
+                        } catch (e) {
+                            // Ignore errors
+                        }
+                    });
+                    
+                    // Collect folders for ALL dependents that point to files inside visible folders
+                    dependents.forEach(depPath => {
+                        try {
+                            const depParentFolder = getParentFolderPath(depPath);
+                            const depParentFolderNode = visibleNodesMap.get(depParentFolder) || nodesById.get(depParentFolder);
+                            if (depParentFolderNode && depParentFolderNode.type === 'folder' && depParentFolderNode.id) {
+                                foldersToShow.add(depParentFolderNode.id);
+                            }
+                        } catch (e) {
+                            // Ignore errors
+                        }
                     });
                     
                     // Get selected node position
@@ -3451,182 +3636,709 @@ def generate_html(data: dict) -> str:
                         const selectedY = parseFloat(selectedNodeElement.select('circle').attr('cy')) || selectedNode.y || 0;
                         const selectedR = parseFloat(selectedNodeElement.select('circle').attr('r')) || getPackRadius(selectedNode);
                         
-                        // Create outside nodes and arrows for outbound dependencies
-                        crossLevelDeps.forEach((depPath, index) => {
+                        // Get selected node color for external nodes
+                        const selectedNodeColor = getNodeColor(selectedNode);
+                        
+                        // Track external nodes count for positioning
+                        let externalNodeIndex = 0;
+                        
+                        // Process outbound dependencies
+                        crossLevelDeps.forEach((depPath) => {
                             // Look up the actual node data for the dependency
-                            const depNode = nodesById.get(depPath);
-                            if (!depNode) return; // Skip if node not found
+                            let depNode = nodesById.get(depPath);
+                            if (!depNode) {
+                                // Try with normalized path
+                                const normalizedDepPath = depPath.replace(/\\\\/g, '/');
+                                depNode = nodesById.get(normalizedDepPath);
+                                if (!depNode) return; // Skip if node not found
+                            }
                             
-                            const relativePath = getRelativePathFromFile(selectedNode.path || selectedNode.id, depPath);
-                            const totalCount = crossLevelDeps.length + crossLevelDependents.length;
-                            const angle = (Math.PI * 2 * index) / Math.max(totalCount, 1) - Math.PI / 2; // Start from top
+                            // Check if dependency exists in current layer (check multiple path formats)
+                            // Try exact matches first
+                            let targetNodeInLayer = visibleNodesMap.get(depPath) || 
+                                                   visibleNodesMap.get(depNode.id) || 
+                                                   visibleNodesMap.get(depNode.path);
                             
-                            // Calculate actual node radius
-                            const nodeRadius = getPackRadius(depNode);
-                            const spacing = 50;
-                            const outsideX = containerCx + Math.cos(angle) * (containerR + spacing + nodeRadius);
-                            const outsideY = containerCy + Math.sin(angle) * (containerR + spacing + nodeRadius);
+                            // Debug logging
+                            if (!targetNodeInLayer && depPath.includes('settings')) {
+                                console.log('Looking for dependency:', depPath);
+                                console.log('Dep node ID:', depNode.id);
+                                console.log('Dep node path:', depNode.path);
+                                console.log('Visible nodes map size:', visibleNodesMap.size);
+                                console.log('Sample visible node keys:', Array.from(visibleNodesMap.keys()).slice(0, 10));
+                            }
                             
-                            // Calculate arrow start/end points on node edges
-                            const dx = outsideX - selectedX;
-                            const dy = outsideY - selectedY;
-                            const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-                            const startX = selectedX + (dx/dist) * selectedR;
-                            const startY = selectedY + (dy/dist) * selectedR;
-                            const endX = outsideX - (dx/dist) * nodeRadius;
-                            const endY = outsideY - (dy/dist) * nodeRadius;
+                            // If not found, try normalized paths
+                            if (!targetNodeInLayer) {
+                                const normalizedDepPath = depPath.replace(/\\\\/g, '/');
+                                targetNodeInLayer = visibleNodesMap.get(normalizedDepPath);
+                            }
+                            if (!targetNodeInLayer && depNode.id) {
+                                const normalizedId = depNode.id.replace(/\\\\/g, '/');
+                                targetNodeInLayer = visibleNodesMap.get(normalizedId);
+                            }
+                            if (!targetNodeInLayer && depNode.path) {
+                                const normalizedPath = depNode.path.replace(/\\\\/g, '/');
+                                targetNodeInLayer = visibleNodesMap.get(normalizedPath);
+                            }
                             
-                            // Draw arrow from selected node to outside node
-                            const linkGroup = g.append('g').attr('class', 'link-cross-level');
-                            linkGroup.append('line')
-                                .attr('x1', startX)
-                                .attr('y1', startY)
-                                .attr('x2', endX)
-                                .attr('y2', endY)
-                                .attr('stroke', '#a855f7')
-                                .attr('stroke-width', 2)
-                                .attr('marker-end', 'url(#arrowhead-cross-level)')
-                                .attr('class', 'link cross-level dep-arrow visible')
-                                .style('cursor', 'pointer')
-                                .on('click', function(event) {
-                                    event.stopPropagation();
-                                    focusFile(depPath);
-                                });
+                            // Also check by comparing paths (in case formats differ)
+                            // This handles cases where dependency path is full (e.g., "client/src/redux/settings/index.js")
+                            // but visible node path is relative (e.g., "settings/index.js")
+                            if (!targetNodeInLayer) {
+                                const depPathNormalized = depPath.replace(/\\\\/g, '/').toLowerCase();
+                                const depPathParts = depPathNormalized.split('/');
+                                
+                                // Try matching with last N segments of dependency path
+                                for (let segCount = Math.min(4, depPathParts.length); segCount >= 1; segCount--) {
+                                    const depSegment = depPathParts.slice(-segCount).join('/');
+                                    targetNodeInLayer = visibleNodesMap.get(depSegment);
+                                    if (targetNodeInLayer) break;
+                                    
+                                    // Also try case-insensitive match
+                                    for (const [key, node] of visibleNodesMap.entries()) {
+                                        const keyLower = key.toLowerCase();
+                                        if (keyLower === depSegment || 
+                                            keyLower.endsWith('/' + depSegment) ||
+                                            depSegment.endsWith('/' + keyLower)) {
+                                            targetNodeInLayer = node;
+                                            break;
+                                        }
+                                    }
+                                    if (targetNodeInLayer) break;
+                                }
+                                
+                                // Final fallback: check if any visible node path ends with dependency path
+                                if (!targetNodeInLayer) {
+                                    for (const [key, node] of visibleNodesMap.entries()) {
+                                        const nodePath = (node.path || node.id || '').replace(/\\\\/g, '/').toLowerCase();
+                                        if (nodePath === depPathNormalized || 
+                                            nodePath.endsWith('/' + depPathNormalized) ||
+                                            depPathNormalized.endsWith('/' + nodePath)) {
+                                            targetNodeInLayer = node;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
                             
-                            // Create outside node styled like regular node but in purple
-                            const outsideNodeGroup = g.append('g').attr('class', 'outside-node')
-                                .attr('data-id', depPath)
-                                .style('cursor', 'pointer')
-                                .on('click', function(event) {
-                                    event.stopPropagation();
-                                    focusFile(depPath);
-                                });
-                            
-                            // Circle styled like regular node but purple
-                            const nodeColor = depNode.type === 'folder' ? '#374151' : '#a855f7';
-                            const strokeColor = depNode.type === 'folder' ? '#111' : '#8b5cf6'; // Darker purple for stroke
-                            outsideNodeGroup.append('circle')
-                                .attr('cx', outsideX)
-                                .attr('cy', outsideY)
-                                .attr('r', nodeRadius)
-                                .attr('fill', nodeColor)
-                                .attr('stroke', strokeColor)
-                                .attr('stroke-width', depNode.type === 'folder' ? 2 : 1);
-                            
-                            // Label inside circle (like regular nodes)
-                            const maxChars = Math.max(1, Math.floor((nodeRadius * 1.6) / 7));
-                            const label = depNode.name.length > maxChars ? depNode.name.slice(0, maxChars - 3) + '...' : depNode.name;
-                            outsideNodeGroup.append('text')
-                                .attr('class', 'node-label-inside')
-                                .attr('x', outsideX)
-                                .attr('y', outsideY)
-                                .attr('text-anchor', 'middle')
-                                .attr('dominant-baseline', 'middle')
-                                .attr('fill', '#ffffff')
-                                .attr('font-size', '12px')
-                                .attr('font-weight', '500')
-                                .text(label);
-                            
-                            // Relative path label below node
-                            outsideNodeGroup.append('text')
-                                .attr('x', outsideX)
-                                .attr('y', outsideY + nodeRadius + 18)
-                                .attr('text-anchor', 'middle')
-                                .attr('fill', '#a855f7')
-                                .attr('font-size', '10px')
-                                .attr('font-family', 'JetBrains Mono, monospace')
-                                .text(relativePath || '../');
+                            if (targetNodeInLayer) {
+                                // Check if target node is nested inside a folder (not directly visible)
+                                const targetParentFolder = getParentFolderPath(targetNodeInLayer.path || targetNodeInLayer.id);
+                                const parentFolderNode = visibleNodesMap.get(targetParentFolder) || nodesById.get(targetParentFolder);
+                                
+                                let targetX, targetY, targetR;
+                                
+                                // If target is nested inside a visible folder, calculate its position
+                                if (parentFolderNode && parentFolderNode.type === 'folder' && 
+                                    parentFolderNode.x !== undefined && parentFolderNode.y !== undefined) {
+                                    // Get folder's children and calculate nested file position
+                                    const folderChildren = (parentFolderNode.children || []).map(id => nodesById.get(id)).filter(Boolean);
+                                    
+                                    // Normalize paths for comparison
+                                    const targetIdNorm = (targetNodeInLayer.id || '').replace(/\\\\/g, '/').toLowerCase();
+                                    const targetPathNorm = (targetNodeInLayer.path || '').replace(/\\\\/g, '/').toLowerCase();
+                                    const depPathNorm = depPath.replace(/\\\\/g, '/').toLowerCase();
+                                    
+                                    // Check if any child matches the target
+                                    const matchingChild = folderChildren.find(c => {
+                                        const cId = (c.id || '').replace(/\\\\/g, '/').toLowerCase();
+                                        const cPath = (c.path || '').replace(/\\\\/g, '/').toLowerCase();
+                                        return cId === targetIdNorm || cPath === targetPathNorm ||
+                                               cId === depPathNorm || cPath === depPathNorm ||
+                                               cId.endsWith('/' + targetIdNorm) || targetIdNorm.endsWith('/' + cId) ||
+                                               cPath.endsWith('/' + targetPathNorm) || targetPathNorm.endsWith('/' + cPath) ||
+                                               cId.endsWith('/' + depPathNorm) || depPathNorm.endsWith('/' + cId) ||
+                                               cPath.endsWith('/' + depPathNorm) || depPathNorm.endsWith('/' + cPath);
+                                    });
+                                    
+                                    if (matchingChild && folderChildren.length > 0) {
+                                        // Calculate pack layout for folder's children - MUST match showFolderPreviewOverlay exactly
+                                        const folderR = parentFolderNode.r || getPackRadius(parentFolderNode);
+                                        const size = Math.max(2 * folderR - 24, 24);
+                                        const root = { children: folderChildren.map(n => ({ ...n, value: 1 })) };
+                                        const hierarchy = d3.hierarchy(root, x => (x === root ? x.children : null)).sum(x => x.value ?? 0);
+                                        d3.pack().size([size, size]).padding(2)(hierarchy);
+                                        const center = size / 2;
+                                        
+                                        // Find the nested file in the hierarchy - match by reference or ID/path
+                                        if (hierarchy.children) {
+                                            for (let i = 0; i < hierarchy.children.length; i++) {
+                                                const c = hierarchy.children[i];
+                                                const childNode = c.data;
+                                                const childId = (childNode.id || '').replace(/\\\\/g, '/').toLowerCase();
+                                                const childPath = (childNode.path || '').replace(/\\\\/g, '/').toLowerCase();
+                                                
+                                                // Match by reference (same object) or by ID/path
+                                                if (childNode === matchingChild ||
+                                                    childId === targetIdNorm || childPath === targetPathNorm ||
+                                                    childId === depPathNorm || childPath === depPathNorm ||
+                                                    childId.endsWith('/' + targetIdNorm) || targetIdNorm.endsWith('/' + childId) ||
+                                                    childPath.endsWith('/' + targetPathNorm) || targetPathNorm.endsWith('/' + childPath)) {
+                                                    // Position is relative to folder center, convert to absolute
+                                                    // This matches exactly how showFolderPreviewOverlay positions circles
+                                                    targetX = parentFolderNode.x + (c.x - center);
+                                                    targetY = parentFolderNode.y + (c.y - center);
+                                                    targetR = Math.max(c.r, 3);
+                                                    
+                                                    // Add persistent orange circle at nested file position
+                                                    const folderElement = g.select(`.node[data-id="${parentFolderNode.id}"]`);
+                                                    if (!folderElement.empty()) {
+                                                        const nestedFileColor = getNodeColor(matchingChild);
+                                                        const circleRadius = Math.max(c.r, 3);
+                                                        const circleGroup = folderElement.append('g')
+                                                            .attr('class', 'nested-file-circle-persistent')
+                                                            .attr('transform', `translate(${c.x - center}, ${c.y - center})`)
+                                                            .style('pointer-events', 'none');
+                                                        
+                                                        // Add circle
+                                                        circleGroup.append('circle')
+                                                            .attr('r', circleRadius)
+                                                            .style('fill', nestedFileColor)
+                                                            .attr('stroke', 'none');
+                                                        
+                                                        // Add text label
+                                                        const fileName = matchingChild.name || matchingChild.id || '';
+                                                        const maxChars = Math.max(1, Math.floor((circleRadius * 2) / 4));
+                                                        const label = fileName.length > maxChars ? fileName.slice(0, maxChars - 3) + '...' : fileName;
+                                                        circleGroup.append('text')
+                                                            .attr('text-anchor', 'middle')
+                                                            .attr('dominant-baseline', 'middle')
+                                                            .attr('fill', '#ffffff')
+                                                            .attr('font-size', Math.max(4, circleRadius * 0.35) + 'px')
+                                                            .attr('font-weight', '500')
+                                                            .style('pointer-events', 'none')
+                                                            .text(label);
+                                                    }
+                                                    
+                                                    break; // Found it, stop searching
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Mark folder for preview overlay
+                                        if (parentFolderNode && parentFolderNode.id) {
+                                            foldersToShow.add(parentFolderNode.id);
+                                        }
+                                    }
+                                }
+                                
+                                // If not nested or calculation failed, try to find as direct node
+                                if (targetX === undefined || targetY === undefined) {
+                                    // Get the actual rendered position from DOM
+                                    let targetNodeElement = g.select(`.node[data-id="${targetNodeInLayer.id}"]`);
+                                    if (targetNodeElement.empty() && targetNodeInLayer.path) {
+                                        targetNodeElement = g.select(`.node[data-id="${targetNodeInLayer.path}"]`);
+                                    }
+                                    if (targetNodeElement.empty() && targetNodeInLayer.id) {
+                                        const normalizedId = targetNodeInLayer.id.replace(/\\\\/g, '/');
+                                        targetNodeElement = g.select(`.node[data-id="${normalizedId}"]`);
+                                    }
+                                    if (targetNodeElement.empty()) {
+                                        // Try finding by iterating through all nodes
+                                        g.selectAll('.node').each(function() {
+                                            const d = d3.select(this).datum();
+                                            if (d) {
+                                                const dId = d.id || '';
+                                                const dPath = d.path || '';
+                                                const targetId = targetNodeInLayer.id || '';
+                                                const targetPath = targetNodeInLayer.path || '';
+                                                
+                                                if (dId === targetId || dPath === targetPath || 
+                                                    dId === targetPath || dPath === targetId ||
+                                                    dId.endsWith('/' + targetId) || targetId.endsWith('/' + dId) ||
+                                                    dPath.endsWith('/' + targetPath) || targetPath.endsWith('/' + dPath)) {
+                                                    targetNodeElement = d3.select(this);
+                                                }
+                                            }
+                                        });
+                                    }
+                                    
+                                    // Get coordinates - prefer DOM, fallback to data
+                                    if (!targetNodeElement.empty()) {
+                                        targetX = parseFloat(targetNodeElement.select('circle').attr('cx')) || targetNodeInLayer.x || 0;
+                                        targetY = parseFloat(targetNodeElement.select('circle').attr('cy')) || targetNodeInLayer.y || 0;
+                                        targetR = parseFloat(targetNodeElement.select('circle').attr('r')) || getPackRadius(targetNodeInLayer);
+                                    } else if (targetNodeInLayer.x !== undefined && targetNodeInLayer.y !== undefined) {
+                                        targetX = targetNodeInLayer.x || 0;
+                                        targetY = targetNodeInLayer.y || 0;
+                                        targetR = getPackRadius(targetNodeInLayer);
+                                    } else {
+                                        return; // Skip if no coordinates available
+                                    }
+                                }
+                                
+                                // Calculate arrow start/end points on node edges
+                                const dx = targetX - selectedX;
+                                const dy = targetY - selectedY;
+                                const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+                                const startX = selectedX + (dx/dist) * selectedR;
+                                const startY = selectedY + (dy/dist) * selectedR;
+                                const endX = targetX - (dx/dist) * targetR;
+                                const endY = targetY - (dy/dist) * targetR;
+                                
+                                // Draw arrow from selected node to target node in layer
+                                // Use purple to distinguish cross-level connections
+                                const linkGroup = g.append('g').attr('class', 'link-cross-level');
+                                linkGroup.append('line')
+                                    .attr('x1', startX)
+                                    .attr('y1', startY)
+                                    .attr('x2', endX)
+                                    .attr('y2', endY)
+                                    .attr('stroke', '#a855f7')
+                                    .attr('stroke-width', 2)
+                                    .attr('stroke-dasharray', '8 8')
+                                    .attr('marker-end', 'url(#arrowhead-cross-level)')
+                                    .attr('class', 'link cross-level dep-arrow visible')
+                                    .style('cursor', 'pointer')
+                                    .style('opacity', 1)
+                                    .on('click', function(event) {
+                                        event.stopPropagation();
+                                        focusFile(depPath);
+                                    });
+                                
+                                // Mark folder for preview overlay if target is nested inside a folder
+                                if (targetX !== undefined && targetY !== undefined && targetNodeInLayer) {
+                                    try {
+                                        const targetParentFolder = getParentFolderPath(targetNodeInLayer.path || targetNodeInLayer.id);
+                                        const parentFolderNode = visibleNodesMap.get(targetParentFolder) || nodesById.get(targetParentFolder);
+                                        if (parentFolderNode && parentFolderNode.type === 'folder' && parentFolderNode.id) {
+                                            foldersToShow.add(parentFolderNode.id);
+                                        }
+                                    } catch (e) {
+                                        console.error('Error tracking folder for preview:', e);
+                                    }
+                                }
+                            } else {
+                                // Behavior 2: Dependency doesn't exist in layer - show as external node
+                                const relativePath = getRelativePathFromFile(selectedNode.path || selectedNode.id, depPath);
+                                const totalExternalCount = crossLevelDeps.filter(d => !visibleNodesMap.get(d)).length + 
+                                                          crossLevelDependents.filter(d => !visibleNodesMap.get(d)).length;
+                                const angle = (Math.PI * 2 * externalNodeIndex) / Math.max(totalExternalCount, 1) - Math.PI / 2;
+                                externalNodeIndex++;
+                                
+                                // Calculate actual node radius
+                                const nodeRadius = getPackRadius(depNode);
+                                const spacing = 50;
+                                const outsideX = containerCx + Math.cos(angle) * (containerR + spacing + nodeRadius);
+                                const outsideY = containerCy + Math.sin(angle) * (containerR + spacing + nodeRadius);
+                                
+                                // Calculate arrow start/end points on node edges
+                                const dx = outsideX - selectedX;
+                                const dy = outsideY - selectedY;
+                                const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+                                const startX = selectedX + (dx/dist) * selectedR;
+                                const startY = selectedY + (dy/dist) * selectedR;
+                                const endX = outsideX - (dx/dist) * nodeRadius;
+                                const endY = outsideY - (dy/dist) * nodeRadius;
+                                
+                                // Draw arrow from selected node to outside node
+                                // Use selected node's color for outbound dependencies
+                                const arrowheadMarker = getOrCreateColoredArrowhead(selectedNodeColor);
+                                const linkGroup = g.append('g').attr('class', 'link-cross-level');
+                                linkGroup.append('line')
+                                    .attr('x1', startX)
+                                    .attr('y1', startY)
+                                    .attr('x2', endX)
+                                    .attr('y2', endY)
+                                    .attr('stroke', selectedNodeColor)
+                                    .attr('stroke-width', 2)
+                                    .attr('marker-end', arrowheadMarker)
+                                    .attr('class', 'link cross-level dep-arrow visible')
+                                    .style('cursor', 'pointer')
+                                    .on('click', function(event) {
+                                        event.stopPropagation();
+                                        focusFile(depPath);
+                                    });
+                                
+                                // Create outside node with same color as selected node (outbound)
+                                const outsideNodeGroup = g.append('g').attr('class', 'outside-node')
+                                    .attr('data-id', depPath)
+                                    .style('cursor', 'pointer')
+                                    .on('click', function(event) {
+                                        event.stopPropagation();
+                                        focusFile(depPath);
+                                    });
+                                
+                                // Use selected node's color for external node
+                                const nodeColor = depNode.type === 'folder' ? '#374151' : selectedNodeColor;
+                                const strokeColor = depNode.type === 'folder' ? '#111' : (d3.color(selectedNodeColor)?.darker(0.5) || '#333');
+                                outsideNodeGroup.append('circle')
+                                    .attr('cx', outsideX)
+                                    .attr('cy', outsideY)
+                                    .attr('r', nodeRadius)
+                                    .attr('fill', nodeColor)
+                                    .attr('stroke', strokeColor)
+                                    .attr('stroke-width', depNode.type === 'folder' ? 2 : 1);
+                                
+                                // Label inside circle (like regular nodes)
+                                const maxChars = Math.max(1, Math.floor((nodeRadius * 1.6) / 7));
+                                const label = depNode.name.length > maxChars ? depNode.name.slice(0, maxChars - 3) + '...' : depNode.name;
+                                outsideNodeGroup.append('text')
+                                    .attr('class', 'node-label-inside')
+                                    .attr('x', outsideX)
+                                    .attr('y', outsideY)
+                                    .attr('text-anchor', 'middle')
+                                    .attr('dominant-baseline', 'middle')
+                                    .attr('fill', '#ffffff')
+                                    .attr('font-size', '12px')
+                                    .attr('font-weight', '500')
+                                    .text(label);
+                                
+                                // Relative path label below node
+                                outsideNodeGroup.append('text')
+                                    .attr('x', outsideX)
+                                    .attr('y', outsideY + nodeRadius + 18)
+                                    .attr('text-anchor', 'middle')
+                                    .attr('fill', selectedNodeColor)
+                                    .attr('font-size', '10px')
+                                    .attr('font-family', 'JetBrains Mono, monospace')
+                                    .text(relativePath || '../');
+                                
+                                // Mark folder for preview overlay if dependency is inside a visible folder
+                                try {
+                                    const depParentFolder = getParentFolderPath(depPath);
+                                    const depParentFolderNode = visibleNodesMap.get(depParentFolder) || nodesById.get(depParentFolder);
+                                    if (depParentFolderNode && depParentFolderNode.type === 'folder' && depParentFolderNode.id) {
+                                        foldersToShow.add(depParentFolderNode.id);
+                                    }
+                                } catch (e) {
+                                    console.error('Error tracking folder for preview:', e);
+                                }
+                            }
                         });
                         
-                        // Create outside nodes and arrows for inbound dependencies
-                        crossLevelDependents.forEach((depPath, index) => {
+                        // Process inbound dependencies
+                        crossLevelDependents.forEach((depPath) => {
                             // Look up the actual node data for the dependency
-                            const depNode = nodesById.get(depPath);
-                            if (!depNode) return; // Skip if node not found
+                            let depNode = nodesById.get(depPath);
+                            if (!depNode) {
+                                const normalizedDepPath = depPath.replace(/\\\\/g, '/');
+                                depNode = nodesById.get(normalizedDepPath);
+                                if (!depNode) return;
+                            }
                             
-                            const relativePath = getRelativePathFromFile(selectedNode.path || selectedNode.id, depPath);
-                            const totalCount = crossLevelDeps.length + crossLevelDependents.length;
-                            const angle = (Math.PI * 2 * (crossLevelDeps.length + index)) / Math.max(totalCount, 1) - Math.PI / 2; // Start from top
+                            // Check if dependency exists in current layer
+                            let sourceNodeInLayer = visibleNodesMap.get(depPath) || 
+                                                   visibleNodesMap.get(depNode.id) || 
+                                                   visibleNodesMap.get(depNode.path);
                             
-                            // Calculate actual node radius
-                            const nodeRadius = getPackRadius(depNode);
-                            const spacing = 50;
-                            const outsideX = containerCx + Math.cos(angle) * (containerR + spacing + nodeRadius);
-                            const outsideY = containerCy + Math.sin(angle) * (containerR + spacing + nodeRadius);
+                            if (!sourceNodeInLayer) {
+                                const normalizedDepPath = depPath.replace(/\\\\/g, '/');
+                                sourceNodeInLayer = visibleNodesMap.get(normalizedDepPath);
+                            }
+                            if (!sourceNodeInLayer && depNode.id) {
+                                const normalizedId = depNode.id.replace(/\\\\/g, '/');
+                                sourceNodeInLayer = visibleNodesMap.get(normalizedId);
+                            }
+                            if (!sourceNodeInLayer && depNode.path) {
+                                const normalizedPath = depNode.path.replace(/\\\\/g, '/');
+                                sourceNodeInLayer = visibleNodesMap.get(normalizedPath);
+                            }
                             
-                            // Calculate arrow start/end points on node edges
-                            const dx = selectedX - outsideX;
-                            const dy = selectedY - outsideY;
-                            const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-                            const startX = outsideX + (dx/dist) * nodeRadius;
-                            const startY = outsideY + (dy/dist) * nodeRadius;
-                            const endX = selectedX - (dx/dist) * selectedR;
-                            const endY = selectedY - (dy/dist) * selectedR;
+                            // Also check by comparing paths
+                            if (!sourceNodeInLayer) {
+                                const depPathNormalized = depPath.replace(/\\\\/g, '/').toLowerCase();
+                                const depPathParts = depPathNormalized.split('/');
+                                
+                                for (let segCount = Math.min(4, depPathParts.length); segCount >= 1; segCount--) {
+                                    const depSegment = depPathParts.slice(-segCount).join('/');
+                                    sourceNodeInLayer = visibleNodesMap.get(depSegment);
+                                    if (sourceNodeInLayer) break;
+                                    
+                                    for (const [key, node] of visibleNodesMap.entries()) {
+                                        const keyLower = key.toLowerCase();
+                                        if (keyLower === depSegment || 
+                                            keyLower.endsWith('/' + depSegment) ||
+                                            depSegment.endsWith('/' + keyLower)) {
+                                            sourceNodeInLayer = node;
+                                            break;
+                                        }
+                                    }
+                                    if (sourceNodeInLayer) break;
+                                }
+                                
+                                if (!sourceNodeInLayer) {
+                                    for (const [key, node] of visibleNodesMap.entries()) {
+                                        const nodePath = (node.path || node.id || '').replace(/\\\\/g, '/').toLowerCase();
+                                        if (nodePath === depPathNormalized || 
+                                            nodePath.endsWith('/' + depPathNormalized) ||
+                                            depPathNormalized.endsWith('/' + nodePath)) {
+                                            sourceNodeInLayer = node;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
                             
-                            // Draw arrow from outside node to selected node
-                            const linkGroup = g.append('g').attr('class', 'link-cross-level');
-                            linkGroup.append('line')
-                                .attr('x1', startX)
-                                .attr('y1', startY)
-                                .attr('x2', endX)
-                                .attr('y2', endY)
-                                .attr('stroke', '#a855f7')
-                                .attr('stroke-width', 2)
-                                .attr('marker-end', 'url(#arrowhead-cross-level)')
-                                .attr('class', 'link cross-level dep-arrow visible')
-                                .style('cursor', 'pointer')
-                                .on('click', function(event) {
-                                    event.stopPropagation();
-                                    focusFile(depPath);
-                                });
-                            
-                            // Create outside node styled like regular node but in purple
-                            const outsideNodeGroup = g.append('g').attr('class', 'outside-node')
-                                .attr('data-id', depPath)
-                                .style('cursor', 'pointer')
-                                .on('click', function(event) {
-                                    event.stopPropagation();
-                                    focusFile(depPath);
-                                });
-                            
-                            // Circle styled like regular node but purple
-                            const nodeColor = depNode.type === 'folder' ? '#374151' : '#a855f7';
-                            const strokeColor = depNode.type === 'folder' ? '#111' : '#8b5cf6'; // Darker purple for stroke
-                            outsideNodeGroup.append('circle')
-                                .attr('cx', outsideX)
-                                .attr('cy', outsideY)
-                                .attr('r', nodeRadius)
-                                .attr('fill', nodeColor)
-                                .attr('stroke', strokeColor)
-                                .attr('stroke-width', depNode.type === 'folder' ? 2 : 1);
-                            
-                            // Label inside circle (like regular nodes)
-                            const maxChars = Math.max(1, Math.floor((nodeRadius * 1.6) / 7));
-                            const label = depNode.name.length > maxChars ? depNode.name.slice(0, maxChars - 3) + '...' : depNode.name;
-                            outsideNodeGroup.append('text')
-                                .attr('class', 'node-label-inside')
-                                .attr('x', outsideX)
-                                .attr('y', outsideY)
-                                .attr('text-anchor', 'middle')
-                                .attr('dominant-baseline', 'middle')
-                                .attr('fill', '#ffffff')
-                                .attr('font-size', '12px')
-                                .attr('font-weight', '500')
-                                .text(label);
-                            
-                            // Relative path label below node
-                            outsideNodeGroup.append('text')
-                                .attr('x', outsideX)
-                                .attr('y', outsideY + nodeRadius + 18)
-                                .attr('text-anchor', 'middle')
-                                .attr('fill', '#a855f7')
-                                .attr('font-size', '10px')
-                                .attr('font-family', 'JetBrains Mono, monospace')
-                                .text(relativePath || '../');
+                            if (sourceNodeInLayer) {
+                                // Check if source node is nested inside a folder (not directly visible)
+                                const sourceParentFolder = getParentFolderPath(sourceNodeInLayer.path || sourceNodeInLayer.id);
+                                const parentFolderNode = visibleNodesMap.get(sourceParentFolder) || nodesById.get(sourceParentFolder);
+                                
+                                let sourceX, sourceY, sourceR;
+                                
+                                // If source is nested inside a visible folder, calculate its position
+                                if (parentFolderNode && parentFolderNode.type === 'folder' && 
+                                    parentFolderNode.x !== undefined && parentFolderNode.y !== undefined) {
+                                    // Get folder's children and calculate nested file position
+                                    const folderChildren = (parentFolderNode.children || []).map(id => nodesById.get(id)).filter(Boolean);
+                                    
+                                    // Normalize paths for comparison
+                                    const sourceIdNorm = (sourceNodeInLayer.id || '').replace(/\\\\/g, '/').toLowerCase();
+                                    const sourcePathNorm = (sourceNodeInLayer.path || '').replace(/\\\\/g, '/').toLowerCase();
+                                    const depPathNorm = depPath.replace(/\\\\/g, '/').toLowerCase();
+                                    
+                                    // Check if any child matches the source
+                                    const matchingChild = folderChildren.find(c => {
+                                        const cId = (c.id || '').replace(/\\\\/g, '/').toLowerCase();
+                                        const cPath = (c.path || '').replace(/\\\\/g, '/').toLowerCase();
+                                        return cId === sourceIdNorm || cPath === sourcePathNorm ||
+                                               cId === depPathNorm || cPath === depPathNorm ||
+                                               cId.endsWith('/' + sourceIdNorm) || sourceIdNorm.endsWith('/' + cId) ||
+                                               cPath.endsWith('/' + sourcePathNorm) || sourcePathNorm.endsWith('/' + cPath) ||
+                                               cId.endsWith('/' + depPathNorm) || depPathNorm.endsWith('/' + cId) ||
+                                               cPath.endsWith('/' + depPathNorm) || depPathNorm.endsWith('/' + cPath);
+                                    });
+                                    
+                                    if (matchingChild && folderChildren.length > 0) {
+                                        // Calculate pack layout for folder's children - MUST match showFolderPreviewOverlay exactly
+                                        const folderR = parentFolderNode.r || getPackRadius(parentFolderNode);
+                                        const size = Math.max(2 * folderR - 24, 24);
+                                        const root = { children: folderChildren.map(n => ({ ...n, value: 1 })) };
+                                        const hierarchy = d3.hierarchy(root, x => (x === root ? x.children : null)).sum(x => x.value ?? 0);
+                                        d3.pack().size([size, size]).padding(2)(hierarchy);
+                                        const center = size / 2;
+                                        
+                                        // Find the nested file in the hierarchy - match by reference or ID/path
+                                        if (hierarchy.children) {
+                                            for (let i = 0; i < hierarchy.children.length; i++) {
+                                                const c = hierarchy.children[i];
+                                                const childNode = c.data;
+                                                const childId = (childNode.id || '').replace(/\\\\/g, '/').toLowerCase();
+                                                const childPath = (childNode.path || '').replace(/\\\\/g, '/').toLowerCase();
+                                                
+                                                // Match by reference (same object) or by ID/path
+                                                if (childNode === matchingChild ||
+                                                    childId === sourceIdNorm || childPath === sourcePathNorm ||
+                                                    childId === depPathNorm || childPath === depPathNorm ||
+                                                    childId.endsWith('/' + sourceIdNorm) || sourceIdNorm.endsWith('/' + childId) ||
+                                                    childPath.endsWith('/' + sourcePathNorm) || sourcePathNorm.endsWith('/' + childPath)) {
+                                                    // Position is relative to folder center, convert to absolute
+                                                    // This matches exactly how showFolderPreviewOverlay positions circles
+                                                    sourceX = parentFolderNode.x + (c.x - center);
+                                                    sourceY = parentFolderNode.y + (c.y - center);
+                                                    sourceR = Math.max(c.r, 3);
+                                                    
+                                                    // Add persistent orange circle at nested file position
+                                                    const folderElement = g.select(`.node[data-id="${parentFolderNode.id}"]`);
+                                                    if (!folderElement.empty()) {
+                                                        const nestedFileColor = getNodeColor(matchingChild);
+                                                        const circleRadius = Math.max(c.r, 3);
+                                                        const circleGroup = folderElement.append('g')
+                                                            .attr('class', 'nested-file-circle-persistent')
+                                                            .attr('transform', `translate(${c.x - center}, ${c.y - center})`)
+                                                            .style('pointer-events', 'none');
+                                                        
+                                                        // Add circle
+                                                        circleGroup.append('circle')
+                                                            .attr('r', circleRadius)
+                                                            .style('fill', nestedFileColor)
+                                                            .attr('stroke', 'none');
+                                                        
+                                                        // Add text label
+                                                        const fileName = matchingChild.name || matchingChild.id || '';
+                                                        const maxChars = Math.max(1, Math.floor((circleRadius * 2) / 4));
+                                                        const label = fileName.length > maxChars ? fileName.slice(0, maxChars - 3) + '...' : fileName;
+                                                        circleGroup.append('text')
+                                                            .attr('text-anchor', 'middle')
+                                                            .attr('dominant-baseline', 'middle')
+                                                            .attr('fill', '#ffffff')
+                                                            .attr('font-size', Math.max(4, circleRadius * 0.35) + 'px')
+                                                            .attr('font-weight', '500')
+                                                            .style('pointer-events', 'none')
+                                                            .text(label);
+                                                    }
+                                                    
+                                                    break; // Found it, stop searching
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Mark folder for preview overlay
+                                        if (parentFolderNode && parentFolderNode.id) {
+                                            foldersToShow.add(parentFolderNode.id);
+                                        }
+                                    }
+                                }
+                                
+                                // If not nested or calculation failed, try to find as direct node
+                                if (sourceX === undefined || sourceY === undefined) {
+                                    // Get the actual rendered position from DOM
+                                    let sourceNodeElement = g.select(`.node[data-id="${sourceNodeInLayer.id}"]`);
+                                    if (sourceNodeElement.empty() && sourceNodeInLayer.path) {
+                                        sourceNodeElement = g.select(`.node[data-id="${sourceNodeInLayer.path}"]`);
+                                    }
+                                    if (sourceNodeElement.empty()) {
+                                        g.selectAll('.node').each(function() {
+                                            const d = d3.select(this).datum();
+                                            if (d && (d.id === sourceNodeInLayer.id || d.path === sourceNodeInLayer.path || d.id === sourceNodeInLayer.path)) {
+                                                sourceNodeElement = d3.select(this);
+                                            }
+                                        });
+                                    }
+                                    if (sourceNodeElement.empty()) return;
+                                    
+                                    sourceX = parseFloat(sourceNodeElement.select('circle').attr('cx')) || sourceNodeInLayer.x || 0;
+                                    sourceY = parseFloat(sourceNodeElement.select('circle').attr('cy')) || sourceNodeInLayer.y || 0;
+                                    sourceR = parseFloat(sourceNodeElement.select('circle').attr('r')) || getPackRadius(sourceNodeInLayer);
+                                }
+                                
+                                const dx = selectedX - sourceX;
+                                const dy = selectedY - sourceY;
+                                const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+                                const startX = sourceX + (dx/dist) * sourceR;
+                                const startY = sourceY + (dy/dist) * sourceR;
+                                const endX = selectedX - (dx/dist) * selectedR;
+                                const endY = selectedY - (dy/dist) * selectedR;
+                                
+                                const linkGroup = g.append('g').attr('class', 'link-cross-level');
+                                linkGroup.append('line')
+                                    .attr('x1', startX)
+                                    .attr('y1', startY)
+                                    .attr('x2', endX)
+                                    .attr('y2', endY)
+                                    .attr('stroke', '#a855f7')
+                                    .attr('stroke-width', 2)
+                                    .attr('stroke-dasharray', '8 8')
+                                    .attr('marker-end', 'url(#arrowhead-cross-level)')
+                                    .attr('class', 'link cross-level dep-arrow visible')
+                                    .style('cursor', 'pointer')
+                                    .style('opacity', 1)
+                                    .on('click', function(event) {
+                                        event.stopPropagation();
+                                        focusFile(depPath);
+                                    });
+                                
+                                // Mark folder for preview overlay if source is nested inside a folder
+                                if (sourceX !== undefined && sourceY !== undefined && sourceNodeInLayer) {
+                                    try {
+                                        const sourceParentFolder = getParentFolderPath(sourceNodeInLayer.path || sourceNodeInLayer.id);
+                                        const sourceParentFolderNode = visibleNodesMap.get(sourceParentFolder) || nodesById.get(sourceParentFolder);
+                                        if (sourceParentFolderNode && sourceParentFolderNode.type === 'folder' && sourceParentFolderNode.id) {
+                                            foldersToShow.add(sourceParentFolderNode.id);
+                                        }
+                                    } catch (e) {
+                                        console.error('Error tracking folder for preview:', e);
+                                    }
+                                }
+                            } else {
+                                // External node for inbound
+                                const depNodeColor = getNodeColor(depNode);
+                                const relativePath = getRelativePathFromFile(selectedNode.path || selectedNode.id, depPath);
+                                const totalExternalCount = crossLevelDeps.filter(d => !visibleNodesMap.get(d)).length + 
+                                                          crossLevelDependents.filter(d => !visibleNodesMap.get(d)).length;
+                                const angle = (Math.PI * 2 * externalNodeIndex) / Math.max(totalExternalCount, 1) - Math.PI / 2;
+                                externalNodeIndex++;
+                                
+                                const nodeRadius = getPackRadius(depNode);
+                                const spacing = 50;
+                                const outsideX = containerCx + Math.cos(angle) * (containerR + spacing + nodeRadius);
+                                const outsideY = containerCy + Math.sin(angle) * (containerR + spacing + nodeRadius);
+                                
+                                const dx = selectedX - outsideX;
+                                const dy = selectedY - outsideY;
+                                const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+                                const startX = outsideX + (dx/dist) * nodeRadius;
+                                const startY = outsideY + (dy/dist) * nodeRadius;
+                                const endX = selectedX - (dx/dist) * selectedR;
+                                const endY = selectedY - (dy/dist) * selectedR;
+                                
+                                const arrowheadMarker = getOrCreateColoredArrowhead(depNodeColor);
+                                const linkGroup = g.append('g').attr('class', 'link-cross-level');
+                                linkGroup.append('line')
+                                    .attr('x1', startX)
+                                    .attr('y1', startY)
+                                    .attr('x2', endX)
+                                    .attr('y2', endY)
+                                    .attr('stroke', depNodeColor)
+                                    .attr('stroke-width', 2)
+                                    .attr('marker-end', arrowheadMarker)
+                                    .attr('class', 'link cross-level dep-arrow visible')
+                                    .style('cursor', 'pointer')
+                                    .on('click', function(event) {
+                                        event.stopPropagation();
+                                        focusFile(depPath);
+                                    });
+                                
+                                const outsideNodeGroup = g.append('g').attr('class', 'outside-node')
+                                    .attr('data-id', depPath)
+                                    .style('cursor', 'pointer')
+                                    .on('click', function(event) {
+                                        event.stopPropagation();
+                                        focusFile(depPath);
+                                    });
+                                
+                                const nodeColor = depNode.type === 'folder' ? '#374151' : depNodeColor;
+                                const strokeColor = depNode.type === 'folder' ? '#111' : (d3.color(depNodeColor)?.darker(0.5) || '#333');
+                                outsideNodeGroup.append('circle')
+                                    .attr('cx', outsideX)
+                                    .attr('cy', outsideY)
+                                    .attr('r', nodeRadius)
+                                    .attr('fill', nodeColor)
+                                    .attr('stroke', strokeColor)
+                                    .attr('stroke-width', depNode.type === 'folder' ? 2 : 1);
+                                
+                                const maxChars = Math.max(1, Math.floor((nodeRadius * 1.6) / 7));
+                                const label = depNode.name.length > maxChars ? depNode.name.slice(0, maxChars - 3) + '...' : depNode.name;
+                                outsideNodeGroup.append('text')
+                                    .attr('class', 'node-label-inside')
+                                    .attr('x', outsideX)
+                                    .attr('y', outsideY)
+                                    .attr('text-anchor', 'middle')
+                                    .attr('dominant-baseline', 'middle')
+                                    .attr('fill', '#ffffff')
+                                    .attr('font-size', '12px')
+                                    .attr('font-weight', '500')
+                                    .text(label);
+                                
+                                outsideNodeGroup.append('text')
+                                    .attr('x', outsideX)
+                                    .attr('y', outsideY + nodeRadius + 18)
+                                    .attr('text-anchor', 'middle')
+                                    .attr('fill', depNodeColor)
+                                    .attr('font-size', '10px')
+                                    .attr('font-family', 'JetBrains Mono, monospace')
+                                    .text(relativePath || '../');
+                                
+                                // Mark folder for preview overlay if dependency is inside a visible folder
+                                try {
+                                    const depParentFolder = getParentFolderPath(depPath);
+                                    const depParentFolderNode = visibleNodesMap.get(depParentFolder) || nodesById.get(depParentFolder);
+                                    if (depParentFolderNode && depParentFolderNode.type === 'folder' && depParentFolderNode.id) {
+                                        foldersToShow.add(depParentFolderNode.id);
+                                    }
+                                } catch (e) {
+                                    console.error('Error tracking folder for preview:', e);
+                                }
+                            }
                         });
                     }
                 }
             }
+            
+            // Show folder preview overlays for all collected folders
+            foldersToShow.forEach(folderId => {
+                try {
+                    const folderNode = visibleNodesMap.get(folderId) || nodesById.get(folderId);
+                    if (folderNode && folderNode.type === 'folder' && 
+                        folderNode.x !== undefined && folderNode.y !== undefined) {
+                        showFolderPreviewOverlay(folderNode, g);
+                    }
+                } catch (e) {
+                    console.error('Error showing folder preview overlay:', e);
+                }
+            });
         }
 
         function escapeAttr(s) {
