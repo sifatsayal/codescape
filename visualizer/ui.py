@@ -375,19 +375,72 @@ def generate_html(data: dict) -> str:
             background: #0a0a12;
         }
 
-        #sidebar {
+        #right-rail {
             position: fixed;
             top: 60px;
             right: 0;
-            width: 380px;
             bottom: 0;
+            display: flex;
+            flex-direction: row-reverse;
+            align-items: stretch;
+            z-index: 30;
+            pointer-events: none;
+        }
+        #right-rail > * { pointer-events: auto; }
+        .panel-toggle-btns {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 12px 8px;
+            background: rgba(15, 15, 25, 0.95);
+            border-left: 1px solid rgba(100, 100, 150, 0.2);
+            align-items: center;
+        }
+        .panel-toggle-btn {
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            border-radius: 10px;
+            background: rgba(100, 100, 150, 0.2);
+            color: #9ca3af;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s, transform 0.15s;
+        }
+        .panel-toggle-btn:hover {
+            background: rgba(124, 58, 237, 0.3);
+            color: #e0e0e0;
+        }
+        .panel-toggle-btn.active {
+            background: rgba(124, 58, 237, 0.4);
+            color: #c4b5fd;
+        }
+        .panel-toggle-btn svg {
+            width: 22px;
+            height: 22px;
+        }
+        #file-info-panel, #changes-panel {
+            width: 0;
+            overflow: hidden;
+            transition: width 0.25s ease;
             background: rgba(15, 15, 25, 0.98);
             border-left: 1px solid rgba(100, 100, 150, 0.2);
+            display: flex;
+            flex-direction: column;
+        }
+        #file-info-panel.open, #changes-panel.open {
+            width: 380px;
+        }
+        #file-info-panel .panel-inner, #changes-panel .panel-inner {
+            width: 380px;
+            min-width: 380px;
+            height: 100%;
             overflow-y: auto;
             padding: 16px;
         }
-        #sidebar.tour-sidebar-highlight {
-            border-left: none;
+        #file-info-panel.tour-sidebar-highlight .panel-inner {
             box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.6), 0 0 24px rgba(124, 58, 237, 0.4);
             animation: tour-sidebar-glow 1.5s ease-in-out infinite;
         }
@@ -461,9 +514,10 @@ def generate_html(data: dict) -> str:
             color: #fca5a5;
         }
         .recent-changes-panel {
-            margin-top: 24px;
-            padding-top: 16px;
-            border-top: 1px solid rgba(100, 100, 150, 0.2);
+            padding-top: 0;
+        }
+        #changes-panel .panel-inner .recent-changes-panel {
+            margin-top: 0;
         }
         .recent-changes-panel.tour-changes-highlight {
             border: 3px solid #06b6d4;
@@ -1774,23 +1828,35 @@ def generate_html(data: dict) -> str:
         </svg>
     </div>
     
-    <div id="sidebar">
-        <div id="sidebar-nav" class="sidebar-nav">
-            <button type="button" id="sidebar-back-btn" class="sidebar-nav-btn" title="Back" aria-label="Back" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
-            <button type="button" id="sidebar-forward-btn" class="sidebar-nav-btn" title="Forward" aria-label="Forward" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+    <div id="right-rail">
+        <div class="panel-toggle-btns">
+            <button type="button" id="panel-toggle-file-btn" class="panel-toggle-btn" title="File info" aria-label="File info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></button>
+            <button type="button" id="panel-toggle-changes-btn" class="panel-toggle-btn" title="Changes in repo" aria-label="Changes in repo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
         </div>
-        <div id="details-panel">
-            <div class="details-placeholder">Click a node to view its details</div>
-        </div>
-        <div id="recent-changes-panel" class="recent-changes-panel">
-            <div id="recent-changes-title" class="recent-changes-title">Changes in this folder</div>
-            <div id="recent-changes-last-send" class="recent-changes-muted">Last Cmd+S: —</div>
-            <div id="recent-changes-list" class="recent-changes-list"></div>
-            <div id="recent-changes-git-section" class="recent-changes-git-section">
-                <div id="recent-changes-git-title" class="recent-changes-title">Previous changes (from earlier Cmd+S)</div>
-                <div id="recent-changes-git-list" class="recent-changes-list"></div>
+        <div id="file-info-panel">
+            <div class="panel-inner">
+                <div id="sidebar-nav" class="sidebar-nav">
+                    <button type="button" id="sidebar-back-btn" class="sidebar-nav-btn" title="Back" aria-label="Back" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+                    <button type="button" id="sidebar-forward-btn" class="sidebar-nav-btn" title="Forward" aria-label="Forward" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+                </div>
+                <div id="details-panel">
+                    <div class="details-placeholder">Click a node to view its details</div>
+                </div>
             </div>
-            <div class="recent-changes-tip">Open via Cursor: <strong>Codebase Visualizer: Visualize Codebase</strong> for live updates on save.</div>
+        </div>
+        <div id="changes-panel">
+            <div class="panel-inner">
+                <div id="recent-changes-panel" class="recent-changes-panel">
+                    <div id="recent-changes-title" class="recent-changes-title">Changes in this folder</div>
+                    <div id="recent-changes-last-send" class="recent-changes-muted">Last Cmd+S: —</div>
+                    <div id="recent-changes-list" class="recent-changes-list"></div>
+                    <div id="recent-changes-git-section" class="recent-changes-git-section">
+                        <div id="recent-changes-git-title" class="recent-changes-title">Previous changes (from earlier Cmd+S)</div>
+                        <div id="recent-changes-git-list" class="recent-changes-list"></div>
+                    </div>
+                    <div class="recent-changes-tip">Open via Cursor: <strong>Codebase Visualizer: Visualize Codebase</strong> for live updates on save.</div>
+                </div>
+            </div>
         </div>
     </div>
     
@@ -3106,8 +3172,8 @@ def generate_html(data: dict) -> str:
             var allowGraphInteraction = steps[idx].allowGraphInteraction === true;
             var overlayEl = document.getElementById('tour-overlay');
             if (overlayEl) overlayEl.classList.toggle('tour-overlay-allow-graph-click', allowGraphInteraction);
-            var sidebarEl = document.getElementById('sidebar');
-            if (sidebarEl) sidebarEl.classList.toggle('tour-sidebar-highlight', isSidebarStep);
+            var fileInfoPanelEl = document.getElementById('file-info-panel');
+            if (fileInfoPanelEl) fileInfoPanelEl.classList.toggle('tour-sidebar-highlight', isSidebarStep);
             if (proTipEl) {
                 proTipEl.style.display = steps[idx].aiSummaryStep === true ? 'block' : 'none';
             }
@@ -3203,6 +3269,7 @@ def generate_html(data: dict) -> str:
         }
 
         function runChangesStepDemo() {
+            openChangesPanel();
             // Use the first tour step's nodeId as the demo file
             var firstStep = window._tourSteps && window._tourSteps[0];
             var nodeId = firstStep && firstStep.nodeId;
@@ -3227,6 +3294,8 @@ def generate_html(data: dict) -> str:
         }
 
         function runAiSummaryStepDemo() {
+            closeChangesPanel();
+            openFilePanel();
             // Clear changes highlight from the previous step
             var changesPanel = document.getElementById('recent-changes-panel');
             if (changesPanel) changesPanel.classList.remove('tour-changes-highlight');
@@ -3274,7 +3343,7 @@ def generate_html(data: dict) -> str:
             window._tourSteps.push(
                 { title: 'Follow the Arrows', body: 'See the arrows on this file? Lines coming IN mean other files depend on it. Lines going OUT mean it imports others. Click around — explore the connections yourself.', nodeId: arrowsNodeId, noDimming: true, allowGraphInteraction: true },
                 { title: 'Size = Importance', body: 'Notice how nodes are different sizes? The bigger the bubble, the more files depend on it. This is called PageRank. Zoom in and out — explore which files matter most in this codebase.', nodeId: null, noDimming: true, allowGraphInteraction: true, sizingStep: true },
-                { title: 'Track Changes Live', body: 'Every time you save a file, Codescape detects what changed. The Git Working Tree shows which files have been modified on your branch. Click \\'AI Summarize\\' to instantly understand what changed and why it matters.', nodeId: null, noDimming: true, allowGraphInteraction: true, changesStep: true },
+                { title: 'Track Changes Live', body: 'Every time you save a file, Codescape detects what changed. This panel shows exactly which files have been modified on your branch, and you can still keep track of the previous changes, ordered from most recent at top, you have made in your working session.', nodeId: null, noDimming: true, allowGraphInteraction: true, changesStep: true },
                 { title: 'Understand Any File Instantly', body: 'See those tabs? Click Overview to get a plain-English summary of any file. Impact shows what breaks if you change it. Edit safely warns you before you touch something critical. Read next tells you where to go next.', nodeId: null, noDimming: true, allowGraphInteraction: true, aiSummaryStep: true }
             );
             if (!window._tourSteps.length) return;
@@ -3340,8 +3409,10 @@ def generate_html(data: dict) -> str:
             window._tourStepsPromise = null;
             const overlayEl = document.getElementById('tour-overlay');
             if (overlayEl) overlayEl.classList.remove('tour-overlay-allow-graph-click');
-            const sidebarEl = document.getElementById('sidebar');
-            if (sidebarEl) sidebarEl.classList.remove('tour-sidebar-highlight');
+            closeFilePanel();
+            closeChangesPanel();
+            const fileInfoPanelEl = document.getElementById('file-info-panel');
+            if (fileInfoPanelEl) fileInfoPanelEl.classList.remove('tour-sidebar-highlight');
             var changesPanel = document.getElementById('recent-changes-panel');
             if (changesPanel) changesPanel.classList.remove('tour-changes-highlight');
             document.querySelectorAll('.ai-summary-section.tour-ai-summary-highlight').forEach(function(el) {
@@ -3368,6 +3439,9 @@ def generate_html(data: dict) -> str:
                 exitTour();
                 return;
             }
+            var leavingStep = window._tourSteps[window._tourStepIndex];
+            if (leavingStep.changesStep) closeChangesPanel();
+            if (leavingStep.aiSummaryStep) closeFilePanel();
             const panelInner = document.getElementById('tour-panel-inner');
             if (panelInner) panelInner.classList.add('tour-content-fade-out');
             setTimeout(function() {
@@ -3398,6 +3472,9 @@ def generate_html(data: dict) -> str:
         
         function tourBack() {
             if (window._tourStepIndex <= 0) return;
+            var leavingStep = window._tourSteps[window._tourStepIndex];
+            if (leavingStep.changesStep) closeChangesPanel();
+            if (leavingStep.aiSummaryStep) closeFilePanel();
             const panelInner = document.getElementById('tour-panel-inner');
             if (panelInner) panelInner.classList.add('tour-content-fade-out');
             setTimeout(function() {
@@ -3921,6 +3998,46 @@ def generate_html(data: dict) -> str:
         const sidebarForwardBtn = document.getElementById('sidebar-forward-btn');
         if (sidebarBackBtn) sidebarBackBtn.addEventListener('click', goBack);
         if (sidebarForwardBtn) sidebarForwardBtn.addEventListener('click', goForward);
+
+        var filePanelOpen = false;
+        var changesPanelOpen = false;
+        function setFilePanelOpen(open) {
+            filePanelOpen = !!open;
+            var el = document.getElementById('file-info-panel');
+            var btn = document.getElementById('panel-toggle-file-btn');
+            if (el) el.classList.toggle('open', filePanelOpen);
+            if (btn) btn.classList.toggle('active', filePanelOpen);
+        }
+        function setChangesPanelOpen(open) {
+            changesPanelOpen = !!open;
+            var el = document.getElementById('changes-panel');
+            var btn = document.getElementById('panel-toggle-changes-btn');
+            if (el) el.classList.toggle('open', changesPanelOpen);
+            if (btn) btn.classList.toggle('active', changesPanelOpen);
+        }
+        function openFilePanel() {
+            setChangesPanelOpen(false);
+            setFilePanelOpen(true);
+        }
+        function closeFilePanel() {
+            setFilePanelOpen(false);
+        }
+        function openChangesPanel() {
+            setFilePanelOpen(false);
+            setChangesPanelOpen(true);
+        }
+        function closeChangesPanel() {
+            setChangesPanelOpen(false);
+        }
+        var filePanelBtn = document.getElementById('panel-toggle-file-btn');
+        var changesPanelBtn = document.getElementById('panel-toggle-changes-btn');
+        if (filePanelBtn) filePanelBtn.addEventListener('click', function() {
+            if (filePanelOpen) closeFilePanel(); else openFilePanel();
+        });
+        if (changesPanelBtn) changesPanelBtn.addEventListener('click', function() {
+            if (changesPanelOpen) closeChangesPanel(); else openChangesPanel();
+        });
+
         const detailsPanel = document.getElementById('details-panel');
         if (detailsPanel) {
             detailsPanel.addEventListener('click', async function(e) {
