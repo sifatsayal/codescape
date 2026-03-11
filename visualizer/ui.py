@@ -120,6 +120,19 @@ def generate_html(data: dict) -> str:
         .breadcrumb-folder:hover {
             color: #6b7280;
         }
+        .breadcrumb-root {
+            background: linear-gradient(180deg, #e8eef4 0%, #c8d4e0 40%, #a0b0c4 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .breadcrumb-root:hover {
+            background: linear-gradient(180deg, #e8eef4 0%, #c8d4e0 40%, #a0b0c4 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            opacity: 0.9;
+        }
         .breadcrumb-sep {
             color: #6b7280;
         }
@@ -412,6 +425,10 @@ def generate_html(data: dict) -> str:
             border-radius: 6px;
         }
         #file-info-panel.tour-sidebar-highlight .panel-inner {
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.6), 0 0 24px rgba(124, 58, 237, 0.4);
+            animation: tour-sidebar-glow 1.5s ease-in-out infinite;
+        }
+        #search-panel.tour-search-highlight .panel-inner {
             box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.6), 0 0 24px rgba(124, 58, 237, 0.4);
             animation: tour-sidebar-glow 1.5s ease-in-out infinite;
         }
@@ -1265,10 +1282,6 @@ def generate_html(data: dict) -> str:
             font-size: 13px;
             transition: width 0.2s ease, padding 0.2s ease;
         }
-        #legend.detailed-open {
-            width: 260px;
-            padding: 18px 12px 18px 18px;
-        }
         .legend-types {
             margin-bottom: 10px;
         }
@@ -1307,19 +1320,6 @@ def generate_html(data: dict) -> str:
             padding-top: 8px;
             border-top: 1px solid rgba(100,100,150,0.2);
         }
-        .legend-simple {
-            display: block;
-        }
-        #legend.detailed-open .legend-simple {
-            display: none;
-        }
-        .legend-detailed {
-            display: none;
-            margin-top: 12px;
-        }
-        #legend.detailed-open .legend-detailed {
-            display: block;
-        }
         .legend-simple-grid {
             display: grid;
             grid-template-columns: 32px 1fr;
@@ -1335,34 +1335,6 @@ def generate_html(data: dict) -> str:
             color: #e7e7ee;
             font-size: 12px;
             line-height: 1.2;
-        }
-        .legend-expand-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: auto;
-            height: auto;
-            padding: 2px;
-            margin-left: auto;
-            border: none;
-            background: transparent;
-            color: #8b8b95;
-            cursor: pointer;
-            flex-shrink: 0;
-            transition: color 0.2s ease, opacity 0.2s ease;
-        }
-        .legend-expand-btn:hover {
-            color: #e7e7ee;
-            opacity: 0.9;
-        }
-        .legend-expand-btn .legend-icon-collapse {
-            display: none;
-        }
-        #legend.detailed-open .legend-expand-btn .legend-icon-expand {
-            display: none;
-        }
-        #legend.detailed-open .legend-expand-btn .legend-icon-collapse {
-            display: block;
         }
         .legend-header {
             display: flex;
@@ -1430,7 +1402,7 @@ def generate_html(data: dict) -> str:
             height: 24px;
             filter: drop-shadow(0 0 10px rgba(124,58,237,0.15));
         }
-        .legend-folder-node circle { fill: #7c3aed; }
+        .legend-folder-node circle { fill: #6b7280; }
         .legend-arrow {
             width: 52px;
             height: 16px;
@@ -1761,7 +1733,7 @@ def generate_html(data: dict) -> str:
         <h1>⬡ Codescape</h1>
         <button type="button" id="tour-start-btn" class="header-tour-btn" title="Start Virtual Guide">✦ Start Virtual Guide</button>
         <div class="breadcrumb" id="breadcrumb">
-            <span class="breadcrumb-item breadcrumb-folder" onclick="navigateTo('', true)">''' + data['rootName'] + '''</span>
+            <span class="breadcrumb-item breadcrumb-folder breadcrumb-root" onclick="navigateTo('', true)">''' + data['rootName'] + '''</span>
         </div>
     </div>
     
@@ -1865,7 +1837,7 @@ def generate_html(data: dict) -> str:
                 <div id="tour-intro" class="tour-intro-screen" style="display: none;">
                     <button type="button" id="tour-intro-close" class="tour-intro-close" title="Close">✕</button>
                     <h2 class="tour-intro-title">Your Codebase Tour</h2>
-                    <p class="tour-intro-subtitle">We'll walk you through the 5 most important files in this codebase, explain how the graph works, and show you where to start.</p>
+                    <p class="tour-intro-subtitle">We'll walk you through important files in this codebase and explain how the visualizer works!</p>
                     <p class="tour-intro-stat" id="tour-intro-stat">📁 Analyzing 0 files across 0 folders</p>
                     <div class="tour-intro-loading" id="tour-intro-loading" style="display: none;">Preparing your tour…</div>
                     <button type="button" id="tour-intro-go" class="tour-intro-go">Let's go →</button>
@@ -1893,15 +1865,16 @@ def generate_html(data: dict) -> str:
     <div id="legend">
   <div class="legend-header">
     <span class="legend-title">Key</span>
-    <button type="button" class="legend-expand-btn" id="legend-expand-btn" title="Expand key">
-        <svg class="legend-icon-expand" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M0 0 L8 0 M0 0 L0 8"/><path d="M24 0 L16 0 M24 0 L24 8"/><path d="M24 24 L16 24 M24 24 L24 16"/><path d="M0 24 L0 16 M0 24 L8 24"/></svg>
-        <svg class="legend-icon-collapse" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6 L0 6 M6 6 L6 0"/><path d="M18 6 L24 6 M18 6 L18 0"/><path d="M18 18 L24 18 M18 18 L18 24"/><path d="M6 18 L0 18 M6 18 L6 24"/></svg>
-      </button>
   </div>
   <div class="legend-simple">
-    <div class="legend-section-title">Scripting languages</div>
+    <div class="legend-section-title">Nodes</div>
     <div id="legend-file-types" class="legend-types"></div>
+    <div class="legend-type-row">
+      <div class="legend-swatch legend-swatch-changed" style="background:#1a1a24; border:2px solid #f59e0b; box-shadow:0 0 8px #f59e0b;"></div>
+      <span class="legend-ext">Changed (working branch)</span>
+    </div>
     <div class="legend-deps-compact">
+      <div class="legend-section-title">Dependencies</div>
       <div class="legend-type-row">
         <svg class="legend-arrow-icon" viewBox="0 0 36 14" aria-hidden="true">
           <line x1="0" y1="7" x2="24" y2="7" stroke="#06b6d4"/>
@@ -1922,54 +1895,6 @@ def generate_html(data: dict) -> str:
           <path d="M24 2 L34 7 L24 12 Z" fill="#f59e0b"/>
         </svg>
         <span class="legend-ext">Outbound</span>
-      </div>
-      <div class="legend-type-row">
-        <div class="legend-swatch legend-swatch-changed" style="background:#1a1a24; border:2px solid #f59e0b; box-shadow:0 0 8px #f59e0b;"></div>
-        <span class="legend-ext">Changed (working branch)</span>
-      </div>
-    </div>
-  </div>
-  <div class="legend-detailed legend-body">
-    <div class="legend-section-title">Scripting languages</div>
-    <div id="legend-file-types-detail" class="legend-types"></div>
-    <div class="legend-section legend-divider">
-      <div class="legend-section-title">Dependencies</div>
-      <div class="legend-caption-top">A → B means A depends on B. Arrows show when a file is selected.</div>
-      <div class="legend-grid">
-        <div class="legend-icon">
-          <svg class="legend-arrow" viewBox="0 0 52 16">
-            <line x1="0" y1="8" x2="44" y2="8" stroke="#06b6d4" marker-end="url(#arrowhead)"></line>
-          </svg>
-        </div>
-        <div class="legend-label">
-          <div class="legend-name">Import (A → B)</div>
-          <div class="legend-caption">Dependency link between files</div>
-        </div>
-        <div class="legend-icon">
-          <svg class="legend-arrow" viewBox="0 0 52 16">
-            <line x1="0" y1="8" x2="44" y2="8" stroke="#22c55e" marker-end="url(#arrowhead-inbound)"></line>
-          </svg>
-        </div>
-        <div class="legend-label">
-          <div class="legend-name">Inbound</div>
-          <div class="legend-caption">Files that import this file</div>
-        </div>
-        <div class="legend-icon">
-          <svg class="legend-arrow" viewBox="0 0 52 16">
-            <line x1="0" y1="8" x2="44" y2="8" stroke="#f59e0b" marker-end="url(#arrowhead-outbound)"></line>
-          </svg>
-        </div>
-        <div class="legend-label">
-          <div class="legend-name">Outbound</div>
-          <div class="legend-caption">Files this file imports</div>
-        </div>
-        <div class="legend-icon">
-          <div class="legend-circle" style="background:#1a1a24; border:2px solid #f59e0b; box-shadow:0 0 6px rgba(245,158,11,0.6);"></div>
-        </div>
-        <div class="legend-label">
-          <div class="legend-name">Changed (working branch)</div>
-          <div class="legend-caption">File or folder with unsaved or recent changes</div>
-        </div>
       </div>
     </div>
   </div>
@@ -2005,7 +1930,7 @@ def generate_html(data: dict) -> str:
         let lastChangesData = { lastSendTimestamp: null, changes: [], batches: [] };
         let gitStatusData = { modified: [], added: [], deleted: [], renamed: [] };
 
-        const FOLDER_COLOR = '#7c3aed';
+        const FOLDER_COLOR = '#6b7280';
         const EXTENSION_PALETTE = [
             '#ec4899', '#06b6d4', '#22c55e', '#f59e0b', '#ef4444', '#14b8a6',
             '#8b5cf6', '#84cc16', '#f43f5e', '#0ea5e9', '#eab308', '#a855f7',
@@ -2216,17 +2141,9 @@ def generate_html(data: dict) -> str:
             });
             html += `<div class="legend-type-row"><div class="legend-swatch" style="background:${FOLDER_COLOR};"></div><span class="legend-ext">Folder</span><span class="legend-count">${folderCount}</span></div>`;
             const container = document.getElementById('legend-file-types');
-            const containerDetail = document.getElementById('legend-file-types-detail');
             if (container) container.innerHTML = html;
-            if (containerDetail) containerDetail.innerHTML = html;
         }
         updateLegend();
-        
-        document.getElementById('legend-expand-btn').addEventListener('click', function () {
-            var legend = document.getElementById('legend');
-            legend.classList.toggle('detailed-open');
-            this.setAttribute('title', legend.classList.contains('detailed-open') ? 'Collapse key' : 'Expand key');
-        });
 
         // When opened from Cursor (or with shared link), URL has ?path=... — auto-load that repo
         (function () {
@@ -2747,7 +2664,7 @@ def generate_html(data: dict) -> str:
         
         function updateBreadcrumb() {
             const parts = currentPath ? currentPath.split('/') : [];
-            let html = `<span class="breadcrumb-item breadcrumb-folder" onclick="navigateTo('', true)">${graphData.rootName}</span>`;
+            let html = `<span class="breadcrumb-item breadcrumb-folder breadcrumb-root" onclick="navigateTo('', true)">${graphData.rootName}</span>`;
             
             let accumulated = '';
             for (const part of parts) {
@@ -3067,26 +2984,29 @@ def generate_html(data: dict) -> str:
             const steps = window._tourSteps;
             const idx = window._tourStepIndex;
             const n = steps.length;
-            progressEl.textContent = 'STEP ' + (idx + 1) + ' OF ' + n;
+            var step = steps[idx];
+            progressEl.textContent = step.progressLabel || ('STEP ' + (idx + 1) + ' OF ' + n);
             if (barFillEl) barFillEl.style.width = (n > 0 ? ((idx + 1) / n) * 100 : 0) + '%';
-            titleEl.textContent = steps[idx].title;
+            titleEl.textContent = step.title;
             bodyEl.style.display = '';
-            bodyEl.textContent = steps[idx].body || 'Placeholder explanation for this step.';
-            var isSidebarStep = steps[idx].sidebarStep === true;
-            var allowGraphInteraction = steps[idx].allowGraphInteraction === true;
+            bodyEl.textContent = step.body || 'Placeholder explanation for this step.';
+            var isSidebarStep = step.sidebarStep === true;
+            var allowGraphInteraction = step.allowGraphInteraction === true;
             var overlayEl = document.getElementById('tour-overlay');
             if (overlayEl) overlayEl.classList.toggle('tour-overlay-allow-graph-click', allowGraphInteraction);
             var fileInfoPanelEl = document.getElementById('file-info-panel');
             if (fileInfoPanelEl) fileInfoPanelEl.classList.toggle('tour-sidebar-highlight', isSidebarStep);
+            var searchPanelEl = document.getElementById('search-panel');
+            if (searchPanelEl) searchPanelEl.classList.toggle('tour-search-highlight', step.searchStep === true);
             if (proTipEl) {
-                proTipEl.style.display = steps[idx].aiSummaryStep === true ? 'block' : 'none';
+                proTipEl.style.display = step.aiSummaryStep === true ? 'block' : 'none';
             }
-            backBtn.style.display = isSidebarStep ? 'none' : '';
+            backBtn.style.display = (isSidebarStep || step.searchStep) ? 'none' : '';
             nextBtn.style.display = '';
             if (exitBtn) exitBtn.textContent = 'Exit';
             backBtn.disabled = idx === 0;
             nextBtn.disabled = false;
-            nextBtn.textContent = idx === n - 1 ? "I'm ready \u2192" : 'Next';
+            nextBtn.textContent = (idx === n - 1 || step.finalStep) ? "I'm ready \u2192" : 'Next';
             dotsEl.innerHTML = '';
             for (let i = 0; i < n; i++) {
                 const dot = document.createElement('div');
@@ -3099,10 +3019,14 @@ def generate_html(data: dict) -> str:
             const fileNodes = graphData.nodes.filter(n => n.type === 'file');
             const stepTitles = ['Entry Point', 'Core Logic', 'UI Layer', 'Config', 'Where to Start'];
             return fileNodes.slice(0, 5).map((n, i) => ({
-                title: stepTitles[i] || 'Step ' + (i + 1),
+                title: stepTitles[i] || 'Important file ' + (i + 1),
                 body: 'Placeholder explanation for this step.',
                 nodeId: n.id
             }));
+        }
+        function getTourFolderNodeId() {
+            const folder = graphData.nodes.find(n => n.type === 'folder' && (n.id || n.path));
+            return folder ? (folder.id || folder.path) : null;
         }
         
         function getTourNodeWithMostLinks(tourNodeIds) {
@@ -3157,7 +3081,6 @@ def generate_html(data: dict) -> str:
         
         function selectNodeForTour(nodeId) {
             if (!nodeId) return;
-            if (window._tourStepIndex >= 6) return;
             var node = nodesById.get(nodeId);
             if (!node) node = graphData.nodes.find(function(n) { return (n.id || n.path) === nodeId; });
             if (!node) return;
@@ -3172,11 +3095,26 @@ def generate_html(data: dict) -> str:
             updateSidebarNav();
         }
 
+        function runFolderStepDemo() {
+            var step = window._tourSteps && window._tourSteps[window._tourStepIndex];
+            if (!step || !step.nodeId) return;
+            var parentPath = getParentFolderPath(step.nodeId);
+            navigateTo(parentPath || '', true);
+            setTimeout(function() {
+                zoomToTourNode();
+            }, 0);
+        }
+        function runSearchStepDemo() {
+            openSearchPanel();
+            setTimeout(function() {
+                var panel = document.getElementById('search-panel');
+                if (panel) panel.classList.add('tour-search-highlight');
+            }, 300);
+        }
         function runChangesStepDemo() {
             openChangesPanel();
-            // Use the first tour step's nodeId as the demo file
-            var firstStep = window._tourSteps && window._tourSteps[0];
-            var nodeId = firstStep && firstStep.nodeId;
+            var fileStep = window._tourSteps && window._tourSteps[1];
+            var nodeId = fileStep && fileStep.nodeId;
             if (!nodeId) return;
             var node = nodesById.get(nodeId) || graphData.nodes.find(function(n) { return (n.id || n.path) === nodeId; });
             if (!node) return;
@@ -3200,12 +3138,10 @@ def generate_html(data: dict) -> str:
         function runAiSummaryStepDemo() {
             closeChangesPanel();
             openFilePanel();
-            // Clear changes highlight from the previous step
             var changesPanel = document.getElementById('recent-changes-panel');
             if (changesPanel) changesPanel.classList.remove('tour-changes-highlight');
-            // Use the first tour step's nodeId as the demo file
-            var firstStep = window._tourSteps && window._tourSteps[0];
-            var nodeId = firstStep && firstStep.nodeId;
+            var fileStep = window._tourSteps && window._tourSteps[1];
+            var nodeId = fileStep && fileStep.nodeId;
             if (!nodeId) return;
             var node = nodesById.get(nodeId) || graphData.nodes.find(function(n) { return (n.id || n.path) === nodeId; });
             if (!node) return;
@@ -3233,33 +3169,47 @@ def generate_html(data: dict) -> str:
             const stepViewEl = document.getElementById('tour-step-view');
             if (introEl) introEl.style.display = 'none';
             if (stepViewEl) stepViewEl.style.display = 'block';
-            if (Array.isArray(apiSteps) && apiSteps.length > 0) {
-                window._tourSteps = apiSteps.map(s => ({
-                    nodeId: (s.nodeId || '').replace(/\\\\/g, '/'),
-                    title: s.title || 'Step',
-                    body: s.explanation || s.body || 'Key file in the codebase.'
-                }));
-            } else {
-                window._tourSteps = getFallbackTourSteps();
-            }
-            var fileStepIds = window._tourSteps.slice(0, 5).map(function(s) { return s.nodeId; }).filter(Boolean);
+            var fileSteps = Array.isArray(apiSteps) && apiSteps.length > 0
+                ? apiSteps.map(s => ({ nodeId: (s.nodeId || '').replace(/\\\\/g, '/'), title: s.title || 'Important file', body: s.explanation || s.body || 'Key file in the codebase.' }))
+                : getFallbackTourSteps();
+            if (fileSteps.length > 5) fileSteps = fileSteps.slice(0, 5);
+            var fileStepIds = fileSteps.map(function(s) { return s.nodeId; }).filter(Boolean);
             var arrowsNodeId = fileStepIds.length ? getTourNodeWithInboundAndOutbound(fileStepIds) : null;
-            window._tourSteps.push(
-                { title: 'Follow the Arrows', body: 'See the arrows on this file? Lines coming IN mean other files depend on it. Lines going OUT mean it imports others. Click around — explore the connections yourself.', nodeId: arrowsNodeId, noDimming: true, allowGraphInteraction: true },
-                { title: 'Size = Importance', body: 'Notice how nodes are different sizes? The bigger the bubble, the more files depend on it. This is called PageRank. Zoom in and out — explore which files matter most in this codebase.', nodeId: null, noDimming: true, allowGraphInteraction: true, sizingStep: true },
-                { title: 'Track Changes Live', body: 'Every time you save a file, Codescape detects what changed. This panel shows exactly which files have been modified on your branch, and you can still keep track of the previous changes, ordered from most recent at top, you have made in your working session.', nodeId: null, noDimming: true, allowGraphInteraction: true, changesStep: true },
-                { title: 'Understand Any File Instantly', body: 'See those tabs? Click Overview to get a plain-English summary of any file. Impact shows what breaks if you change it. Edit safely warns you before you touch something critical. Read next tells you where to go next.', nodeId: null, noDimming: true, allowGraphInteraction: true, aiSummaryStep: true }
-            );
+            var folderNodeId = getTourFolderNodeId();
+            window._tourSteps = [
+                { progressLabel: 'Part 1', title: 'Five important files', body: "First, we'll show you the five most important files in your codebase. These are determined by PageRank: the more files that depend on a file, the more important it is.", sectionIntro: true },
+                { progressLabel: 'File 1 of 5', title: fileSteps[0] ? fileSteps[0].title : 'File 1', body: fileSteps[0] ? fileSteps[0].body : '', nodeId: fileSteps[0] ? fileSteps[0].nodeId : null },
+                { progressLabel: 'File 2 of 5', title: fileSteps[1] ? fileSteps[1].title : 'File 2', body: fileSteps[1] ? fileSteps[1].body : '', nodeId: fileSteps[1] ? fileSteps[1].nodeId : null },
+                { progressLabel: 'File 3 of 5', title: fileSteps[2] ? fileSteps[2].title : 'File 3', body: fileSteps[2] ? fileSteps[2].body : '', nodeId: fileSteps[2] ? fileSteps[2].nodeId : null },
+                { progressLabel: 'File 4 of 5', title: fileSteps[3] ? fileSteps[3].title : 'File 4', body: fileSteps[3] ? fileSteps[3].body : '', nodeId: fileSteps[3] ? fileSteps[3].nodeId : null },
+                { progressLabel: 'File 5 of 5', title: fileSteps[4] ? fileSteps[4].title : 'File 5', body: fileSteps[4] ? fileSteps[4].body : '', nodeId: fileSteps[4] ? fileSteps[4].nodeId : null },
+                { progressLabel: 'Part 2', title: 'How to use Codescape', body: "Now we'll walk you through how to use and understand Codescape.", section2Intro: true },
+                { progressLabel: 'Step 1 of 7', title: 'Folders', body: 'These grey circles are folders. You can hover to view the files inside, or click to navigate into the folder.', nodeId: folderNodeId, folderStep: true, noDimming: true, allowGraphInteraction: true },
+                { progressLabel: 'Step 2 of 7', title: 'Follow the Arrows', body: 'See the arrows on this file? Lines coming IN mean other files depend on it. Lines going OUT mean it imports others. Click around — explore the connections yourself.', nodeId: arrowsNodeId, noDimming: true, allowGraphInteraction: true },
+                { progressLabel: 'Step 3 of 7', title: 'Size = Importance', body: 'Notice how nodes are different sizes? The bigger the bubble, the more files depend on it. This is called PageRank. Zoom in and out — explore which files matter most in this codebase.', nodeId: null, noDimming: true, allowGraphInteraction: true, sizingStep: true },
+                { progressLabel: 'Step 4 of 7', title: 'File information at a glance', body: 'This panel shows basic information about the file, as well as any of its dependencies.', nodeId: null, sidebarStep: true },
+                { progressLabel: 'Step 5 of 7', title: 'See actionable insights', body: 'See those tabs? Click Overview to get a plain-English summary of any file. Impact shows what breaks if you change it. Edit safely warns you before you touch something critical. Read next tells you where to go next.', nodeId: null, noDimming: true, allowGraphInteraction: true, aiSummaryStep: true },
+                { progressLabel: 'Step 6 of 7', title: 'Track Changes Live', body: 'Every time you save a file, Codescape detects what changed. This panel shows exactly which files have been modified on your branch, and you can still keep track of the previous changes, ordered from most recent at top, you have made in your working session.', nodeId: null, noDimming: true, allowGraphInteraction: true, changesStep: true },
+                { progressLabel: 'Step 7 of 7', title: 'Search', body: 'Use the Search tab to find any file or folder by name. Open the tab, type, and click a result to jump to it on the graph.', nodeId: null, noDimming: true, allowGraphInteraction: true, searchStep: true },
+                { progressLabel: "You're ready!", title: "You're all set!", body: 'Explore your codebase. Click nodes, follow arrows, and use the panels to understand and navigate.', finalStep: true }
+            ];
             if (!window._tourSteps.length) return;
             window._tourActive = true;
             window._tourStepIndex = 0;
-            const parentPath = getParentFolderPath(window._tourSteps[0].nodeId);
-            navigateTo(parentPath || '', true);
             document.getElementById('tour-overlay').classList.add('active');
             updateTourUI();
             setTimeout(function() {
-                zoomToTourNode();
-                if (window._tourSteps[0].nodeId) setTimeout(function() { selectNodeForTour(window._tourSteps[0].nodeId); }, 700);
+                var step = window._tourSteps[0];
+                if (step.sectionIntro) {
+                    zoomOutForTour();
+                } else if (step.nodeId) {
+                    var parentPath = getParentFolderPath(step.nodeId);
+                    navigateTo(parentPath || '', true);
+                    zoomToTourNode();
+                    if (step.nodeId && !step.folderStep) setTimeout(function() { selectNodeForTour(step.nodeId); }, 700);
+                } else {
+                    zoomOutForTour();
+                }
             }, 50);
         }
         
@@ -3317,6 +3267,8 @@ def generate_html(data: dict) -> str:
             closeChangesPanel();
             const fileInfoPanelEl = document.getElementById('file-info-panel');
             if (fileInfoPanelEl) fileInfoPanelEl.classList.remove('tour-sidebar-highlight');
+            var searchPanelEl = document.getElementById('search-panel');
+            if (searchPanelEl) searchPanelEl.classList.remove('tour-search-highlight');
             var changesPanel = document.getElementById('recent-changes-panel');
             if (changesPanel) changesPanel.classList.remove('tour-changes-highlight');
             document.querySelectorAll('.ai-summary-section.tour-ai-summary-highlight').forEach(function(el) {
@@ -3346,29 +3298,40 @@ def generate_html(data: dict) -> str:
             var leavingStep = window._tourSteps[window._tourStepIndex];
             if (leavingStep.changesStep) closeChangesPanel();
             if (leavingStep.aiSummaryStep) closeFilePanel();
+            if (leavingStep.searchStep) { closeSearchPanel(); document.getElementById('search-panel') && document.getElementById('search-panel').classList.remove('tour-search-highlight'); }
             const panelInner = document.getElementById('tour-panel-inner');
             if (panelInner) panelInner.classList.add('tour-content-fade-out');
             setTimeout(function() {
                 window._tourStepIndex++;
                 const step = window._tourSteps[window._tourStepIndex];
                 updateTourUI();
-                if (step.zoomOut) {
+                if (step.sectionIntro || step.section2Intro) {
+                    zoomOutForTour();
+                } else if (step.zoomOut) {
                     zoomOutForTour();
                 } else if (step.sizingStep) {
                     deselectAndZoomOutToRoot();
                 } else if (step.sidebarStep) {
-                    // No navigation, no zoom; sidebar highlight is applied in updateTourUI
+                    openFilePanel();
+                    var fileStep = window._tourSteps[1];
+                    if (fileStep && fileStep.nodeId) { selectNodeForTour(fileStep.nodeId); renderGraph(); renderSidePanel(); }
                 } else if (step.changesStep) {
                     runChangesStepDemo();
                 } else if (step.aiSummaryStep) {
                     runAiSummaryStepDemo();
+                } else if (step.searchStep) {
+                    runSearchStepDemo();
+                } else if (step.folderStep) {
+                    runFolderStepDemo();
                 } else if (step.nodeId) {
-                    const parentPath = getParentFolderPath(step.nodeId);
+                    var parentPath = getParentFolderPath(step.nodeId);
                     navigateTo(parentPath || '', true);
                     setTimeout(function() {
                         zoomToTourNode();
-                        if (window._tourStepIndex <= 5 && step.nodeId) setTimeout(function() { selectNodeForTour(step.nodeId); }, 700);
+                        if (!step.folderStep && step.nodeId) setTimeout(function() { selectNodeForTour(step.nodeId); }, 700);
                     }, 0);
+                } else if (step.finalStep) {
+                    zoomOutForTour();
                 }
                 if (panelInner) panelInner.classList.remove('tour-content-fade-out');
             }, 150);
@@ -3379,29 +3342,40 @@ def generate_html(data: dict) -> str:
             var leavingStep = window._tourSteps[window._tourStepIndex];
             if (leavingStep.changesStep) closeChangesPanel();
             if (leavingStep.aiSummaryStep) closeFilePanel();
+            if (leavingStep.searchStep) { closeSearchPanel(); document.getElementById('search-panel') && document.getElementById('search-panel').classList.remove('tour-search-highlight'); }
             const panelInner = document.getElementById('tour-panel-inner');
             if (panelInner) panelInner.classList.add('tour-content-fade-out');
             setTimeout(function() {
                 window._tourStepIndex--;
                 const step = window._tourSteps[window._tourStepIndex];
                 updateTourUI();
-                if (step.zoomOut) {
+                if (step.sectionIntro || step.section2Intro) {
+                    zoomOutForTour();
+                } else if (step.zoomOut) {
                     zoomOutForTour();
                 } else if (step.sizingStep) {
                     deselectAndZoomOutToRoot();
                 } else if (step.sidebarStep) {
-                    // No navigation; sidebar highlight is removed in updateTourUI when we leave this step
+                    openFilePanel();
+                    var fileStep = window._tourSteps[1];
+                    if (fileStep && fileStep.nodeId) { selectNodeForTour(fileStep.nodeId); renderGraph(); renderSidePanel(); }
                 } else if (step.changesStep) {
                     runChangesStepDemo();
                 } else if (step.aiSummaryStep) {
                     runAiSummaryStepDemo();
+                } else if (step.searchStep) {
+                    runSearchStepDemo();
+                } else if (step.folderStep) {
+                    runFolderStepDemo();
                 } else if (step.nodeId) {
-                    const parentPath = getParentFolderPath(step.nodeId);
+                    var parentPath = getParentFolderPath(step.nodeId);
                     navigateTo(parentPath || '', true);
                     setTimeout(function() {
                         zoomToTourNode();
-                        if (window._tourStepIndex <= 5 && step.nodeId) setTimeout(function() { selectNodeForTour(step.nodeId); }, 700);
+                        if (!step.folderStep && step.nodeId) setTimeout(function() { selectNodeForTour(step.nodeId); }, 700);
                     }, 0);
+                } else if (step.finalStep) {
+                    zoomOutForTour();
                 }
                 if (panelInner) panelInner.classList.remove('tour-content-fade-out');
             }, 150);
