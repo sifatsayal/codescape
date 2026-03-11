@@ -111,15 +111,15 @@ def generate_html(data: dict) -> str:
         }
         
         .breadcrumb-item {
-            color: #7c3aed;
             cursor: pointer;
             transition: color 0.2s;
         }
-        
-        .breadcrumb-item:hover {
-            color: #a78bfa;
+        .breadcrumb-folder {
+            color: #6b7280;
         }
-        
+        .breadcrumb-folder:hover {
+            color: #6b7280;
+        }
         .breadcrumb-sep {
             color: #6b7280;
         }
@@ -127,77 +127,6 @@ def generate_html(data: dict) -> str:
             color: #06b6d4;
         }
 
-        .header-load-repo {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-left: 16px;
-        }
-        .header-load-repo input {
-            width: 200px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-            padding: 6px 10px;
-            border-radius: 6px;
-            border: 1px solid rgba(100, 100, 150, 0.3);
-            background: rgba(30, 30, 50, 0.8);
-            color: #e0e0e0;
-        }
-        .header-load-repo input::placeholder {
-            color: #666;
-        }
-        .header-load-repo input:focus {
-            outline: none;
-            border-color: #7c3aed;
-        }
-        .header-load-repo button {
-            font-size: 12px;
-            padding: 6px 12px;
-            border-radius: 6px;
-            border: 1px solid rgba(124, 58, 237, 0.5);
-            background: rgba(124, 58, 237, 0.25);
-            color: #c4b5fd;
-            cursor: pointer;
-            white-space: nowrap;
-        }
-        .header-load-repo button:hover:not(:disabled) {
-            background: rgba(124, 58, 237, 0.4);
-        }
-        .header-load-repo button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        .header-load-repo button.browse-btn {
-            border-color: rgba(6, 182, 212, 0.5);
-            background: rgba(6, 182, 212, 0.2);
-            color: #67e8f9;
-        }
-        .header-load-repo button.browse-btn:hover:not(:disabled) {
-            background: rgba(6, 182, 212, 0.35);
-        }
-        .header-search {
-            position: relative;
-            margin-left: 16px;
-            flex: 0 0 280px;
-        }
-        .header-search input {
-            width: 100%;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-            padding: 6px 28px 6px 10px;
-            border-radius: 6px;
-            border: 1px solid rgba(100, 100, 150, 0.3);
-            background: rgba(20, 20, 35, 0.9);
-            color: #e0e0e0;
-        }
-        .header-search input::placeholder {
-            color: #666;
-        }
-        .header-search input:focus {
-            outline: none;
-            border-color: #06b6d4;
-            box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.6);
-        }
         .search-clear-btn {
             position: absolute;
             top: 50%;
@@ -421,7 +350,7 @@ def generate_html(data: dict) -> str:
             width: 22px;
             height: 22px;
         }
-        #file-info-panel, #changes-panel {
+        #file-info-panel, #changes-panel, #search-panel {
             width: 0;
             overflow: hidden;
             transition: width 0.25s ease;
@@ -430,15 +359,57 @@ def generate_html(data: dict) -> str:
             display: flex;
             flex-direction: column;
         }
-        #file-info-panel.open, #changes-panel.open {
+        #file-info-panel.open, #changes-panel.open, #search-panel.open {
             width: 380px;
         }
-        #file-info-panel .panel-inner, #changes-panel .panel-inner {
+        #file-info-panel .panel-inner, #changes-panel .panel-inner, #search-panel .panel-inner {
             width: 380px;
             min-width: 380px;
             height: 100%;
             overflow-y: auto;
             padding: 16px;
+        }
+        .panel-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #e5e7eb;
+            text-align: center;
+            margin: 0 0 14px 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(100, 100, 150, 0.2);
+        }
+        .search-panel-search {
+            position: relative;
+            margin-bottom: 12px;
+        }
+        .search-panel-search input {
+            width: 100%;
+            box-sizing: border-box;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            padding: 8px 28px 8px 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(100, 100, 150, 0.3);
+            background: rgba(20, 20, 35, 0.9);
+            color: #e0e0e0;
+        }
+        .search-panel-search input::placeholder { color: #666; }
+        .search-panel-search input:focus {
+            outline: none;
+            border-color: #06b6d4;
+            box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.6);
+        }
+        .search-panel-search .search-clear-btn {
+            position: absolute;
+            top: 50%;
+            right: 8px;
+            transform: translateY(-50%);
+        }
+        #search-panel .search-results {
+            position: static;
+            margin-top: 0;
+            max-height: min(400px, 50vh);
+            border-radius: 6px;
         }
         #file-info-panel.tour-sidebar-highlight .panel-inner {
             box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.6), 0 0 24px rgba(124, 58, 237, 0.4);
@@ -544,8 +515,19 @@ def generate_html(data: dict) -> str:
             font-family: 'JetBrains Mono', monospace;
             line-height: 1.5;
         }
-        .recent-changes-muted {
+        .last-save-box {
             margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #e5e7eb;
+            background: rgba(107, 114, 128, 0.25);
+            border: 1px solid rgba(107, 114, 128, 0.35);
+        }
+        .last-save-box.recent {
+            background: rgba(234, 179, 8, 0.25);
+            border-color: rgba(234, 179, 8, 0.5);
+            color: #fef08a;
         }
         .recent-changes-list {
             max-height: 200px;
@@ -562,15 +544,6 @@ def generate_html(data: dict) -> str:
         }
         .recent-changes-git-section .recent-changes-title {
             margin-bottom: 6px;
-        }
-        .recent-changes-tip {
-            margin-top: 12px;
-            font-size: 10px;
-            color: #6b7280;
-            line-height: 1.35;
-        }
-        .recent-changes-tip strong {
-            color: #9ca3af;
         }
         .git-status-line {
             font-size: 12px;
@@ -612,25 +585,42 @@ def generate_html(data: dict) -> str:
             border-radius: 6px;
             border-left: 2px solid #60a5fa;
         }
-        .git-status-line-wrap { margin-bottom: 10px; }
         .change-line-with-desc {
-            margin-bottom: 10px;
+            margin-bottom: 12px;
+        }
+        .change-line-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 2px;
         }
         .change-line-with-desc .change-line-text {
-            margin-bottom: 4px;
+            flex: 1;
+            min-width: 0;
+            font-weight: 500;
+            color: #e5e7eb;
+            word-break: break-all;
         }
-        .change-describe-btn {
-            font-size: 11px;
-            padding: 4px 8px;
-            border: 1px solid rgba(245, 158, 11, 0.5);
-            background: rgba(245, 158, 11, 0.2);
-            color: #fbbf24;
-            border-radius: 4px;
+        .change-desc-toggle {
+            flex-shrink: 0;
+            width: 22px;
+            height: 22px;
+            padding: 0;
+            border: none;
+            background: none;
+            color: #9ca3af;
+            font-size: 12px;
             cursor: pointer;
-            margin-right: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        .change-describe-btn:hover {
-            background: rgba(245, 158, 11, 0.35);
+        .change-desc-toggle:hover {
+            color: #d1d5db;
+        }
+        .change-desc-toggle:disabled {
+            opacity: 0.7;
+            cursor: wait;
         }
         .change-description {
             font-size: 11px;
@@ -639,7 +629,8 @@ def generate_html(data: dict) -> str:
             padding: 8px;
             background: rgba(20, 20, 35, 0.6);
             border-radius: 6px;
-            border-left: 2px solid #f59e0b;
+            border-left: 2px solid #6b7280;
+            line-height: 1.4;
         }
         .details-placeholder {
             color: #888;
@@ -691,6 +682,12 @@ def generate_html(data: dict) -> str:
             font-weight: 600;
             margin-bottom: 8px;
             word-break: break-all;
+        }
+        .file-name span {
+            color: #9ca3af;
+        }
+        .file-name-folder span {
+            color: #6b7280;
         }
         .sidebar-icon {
             flex-shrink: 0;
@@ -1138,7 +1135,7 @@ def generate_html(data: dict) -> str:
         }
         
         .node.folder circle {
-            fill: #374151;
+            fill: #6b7280;
             stroke: #111;
         }
         
@@ -1198,7 +1195,7 @@ def generate_html(data: dict) -> str:
         }
         
         .link.import {
-            stroke: #7c3aed;
+            stroke: #6b7280;
         }
         
         .link.inbound {
@@ -1217,7 +1214,6 @@ def generate_html(data: dict) -> str:
         }
         
         .link.cross-level {
-            stroke: #a855f7;
             stroke-width: 2px;
             cursor: pointer;
         }
@@ -1238,7 +1234,7 @@ def generate_html(data: dict) -> str:
         }
         
         .link-arrow {
-            fill: #7c3aed;
+            fill: #6b7280;
         }
         
         .container-circle {
@@ -1763,19 +1759,9 @@ def generate_html(data: dict) -> str:
 <body>
     <div id="header">
         <h1>⬡ Codescape</h1>
-        <div class="header-load-repo">
-            <input type="text" id="load-repo-path" placeholder="Path to repo" title="Enter a folder path or click Browse" />
-            <button type="button" id="load-repo-browse-btn" class="browse-btn" title="Choose folder on your computer">Browse</button>
-            <button type="button" id="load-repo-btn">Load repo</button>
-        </div>
-        <div class="header-search">
-            <input type="text" id="search-input" placeholder="Search files and folders…" autocomplete="off" />
-            <button type="button" id="search-clear-btn" class="search-clear-btn" title="Clear search">×</button>
-            <div id="search-results" class="search-results"></div>
-        </div>
         <button type="button" id="tour-start-btn" class="header-tour-btn" title="Start Virtual Guide">✦ Start Virtual Guide</button>
         <div class="breadcrumb" id="breadcrumb">
-            <span class="breadcrumb-item" onclick="navigateTo('', true)">''' + data['rootName'] + '''</span>
+            <span class="breadcrumb-item breadcrumb-folder" onclick="navigateTo('', true)">''' + data['rootName'] + '''</span>
         </div>
     </div>
     
@@ -1812,7 +1798,7 @@ def generate_html(data: dict) -> str:
                 </symbol>
                 <!-- Arrowheads at 0.7x size (7x4.9) for all nodes -->
                 <marker id="arrowhead" markerWidth="7" markerHeight="4.9" refX="7" refY="2.45" orient="auto">
-                    <polygon points="0 0, 7 2.45, 0 4.9" fill="#06b6d4"/>
+                    <polygon points="0 0, 7 2.45, 0 4.9" fill="#6b7280"/>
                 </marker>
                 <marker id="arrowhead-inbound" markerWidth="7" markerHeight="4.9" refX="7" refY="2.45" orient="auto">
                     <polygon points="0 0, 7 2.45, 0 4.9" fill="#22c55e"/>
@@ -1822,7 +1808,7 @@ def generate_html(data: dict) -> str:
                 </marker>
                 <!-- Purple arrowhead for cross-level dependencies -->
                 <marker id="arrowhead-cross-level" markerWidth="7" markerHeight="4.9" refX="7" refY="2.45" orient="auto">
-                    <polygon points="0 0, 7 2.45, 0 4.9" fill="#a855f7"/>
+                    <polygon points="0 0, 7 2.45, 0 4.9" fill="#22c55e"/>
                 </marker>
             </defs>
         </svg>
@@ -1830,11 +1816,13 @@ def generate_html(data: dict) -> str:
     
     <div id="right-rail">
         <div class="panel-toggle-btns">
-            <button type="button" id="panel-toggle-file-btn" class="panel-toggle-btn" title="File info" aria-label="File info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></button>
-            <button type="button" id="panel-toggle-changes-btn" class="panel-toggle-btn" title="Changes in repo" aria-label="Changes in repo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button type="button" id="panel-toggle-file-btn" class="panel-toggle-btn" title="Selection Information" aria-label="Selection Information"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></button>
+            <button type="button" id="panel-toggle-changes-btn" class="panel-toggle-btn" title="Change Panel" aria-label="Change Panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button type="button" id="panel-toggle-search-btn" class="panel-toggle-btn" title="Search" aria-label="Search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></button>
         </div>
         <div id="file-info-panel">
             <div class="panel-inner">
+                <h2 class="panel-title">Selection Information</h2>
                 <div id="sidebar-nav" class="sidebar-nav">
                     <button type="button" id="sidebar-back-btn" class="sidebar-nav-btn" title="Back" aria-label="Back" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
                     <button type="button" id="sidebar-forward-btn" class="sidebar-nav-btn" title="Forward" aria-label="Forward" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
@@ -1846,16 +1834,26 @@ def generate_html(data: dict) -> str:
         </div>
         <div id="changes-panel">
             <div class="panel-inner">
+                <h2 class="panel-title">Change Panel</h2>
                 <div id="recent-changes-panel" class="recent-changes-panel">
-                    <div id="recent-changes-title" class="recent-changes-title">Changes in this folder</div>
-                    <div id="recent-changes-last-send" class="recent-changes-muted">Last Cmd+S: —</div>
+                    <div id="recent-changes-title" class="recent-changes-title">Changes from Recent Save</div>
+                    <div id="recent-changes-last-send" class="last-save-box">—</div>
                     <div id="recent-changes-list" class="recent-changes-list"></div>
                     <div id="recent-changes-git-section" class="recent-changes-git-section">
-                        <div id="recent-changes-git-title" class="recent-changes-title">Previous changes (from earlier Cmd+S)</div>
+                        <div id="recent-changes-git-title" class="recent-changes-title">Changes from Previous Saves</div>
                         <div id="recent-changes-git-list" class="recent-changes-list"></div>
                     </div>
-                    <div class="recent-changes-tip">Open via Cursor: <strong>Codebase Visualizer: Visualize Codebase</strong> for live updates on save.</div>
                 </div>
+            </div>
+        </div>
+        <div id="search-panel">
+            <div class="panel-inner">
+                <h2 class="panel-title">Search</h2>
+                <div class="search-panel-search">
+                    <input type="text" id="search-input" placeholder="Search files and folders…" autocomplete="off" />
+                    <button type="button" id="search-clear-btn" class="search-clear-btn" title="Clear search">×</button>
+                </div>
+                <div id="search-results" class="search-results"></div>
             </div>
         </div>
     </div>
@@ -2183,12 +2181,9 @@ def generate_html(data: dict) -> str:
             }
         }
 
-        async function loadRepo() {
-            const pathInput = document.getElementById('load-repo-path');
-            const path = (pathInput && pathInput.value) ? pathInput.value.trim() : '';
+        async function loadRepo(pathFromUrl) {
+            const path = (pathFromUrl && pathFromUrl.trim()) ? pathFromUrl.trim() : '';
             if (!path) return;
-            const btn = document.getElementById('load-repo-btn');
-            if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
             try {
                 const resp = await fetch('/api/load?path=' + encodeURIComponent(path));
                 const data = await resp.json();
@@ -2196,8 +2191,6 @@ def generate_html(data: dict) -> str:
                 updateGraphData(data);
             } catch (e) {
                 alert('Failed to load repo: ' + e.message);
-            } finally {
-                if (btn) { btn.disabled = false; btn.textContent = 'Load repo'; }
             }
         }
 
@@ -2235,37 +2228,11 @@ def generate_html(data: dict) -> str:
             this.setAttribute('title', legend.classList.contains('detailed-open') ? 'Collapse key' : 'Expand key');
         });
 
-        const loadRepoBtn = document.getElementById('load-repo-btn');
-        const loadRepoPath = document.getElementById('load-repo-path');
-        if (loadRepoBtn) loadRepoBtn.addEventListener('click', loadRepo);
-        if (loadRepoPath) loadRepoPath.addEventListener('keydown', function (e) { if (e.key === 'Enter') loadRepo(); });
-        const browseBtn = document.getElementById('load-repo-browse-btn');
-        if (browseBtn) browseBtn.addEventListener('click', async function () {
-            browseBtn.disabled = true;
-            browseBtn.textContent = 'Opening…';
-            try {
-                const resp = await fetch('/api/browse');
-                const data = await resp.json();
-                if (data.path && loadRepoPath) {
-                    loadRepoPath.value = data.path;
-                    loadRepo();
-                }
-            } catch (e) {
-                alert('Browse failed: ' + e.message);
-            } finally {
-                browseBtn.disabled = false;
-                browseBtn.textContent = 'Browse';
-            }
-        });
-
-        // If URL has ?path=..., auto-load that folder (e.g. from Cursor or shared link)
+        // When opened from Cursor (or with shared link), URL has ?path=... — auto-load that repo
         (function () {
             const params = new URLSearchParams(window.location.search);
             const pathParam = params.get('path');
-            if (pathParam && loadRepoPath) {
-                loadRepoPath.value = pathParam;
-                loadRepo();
-            }
+            if (pathParam) loadRepo(pathParam);
         })();
 
         const width = document.getElementById('graph-container').clientWidth;
@@ -2382,7 +2349,9 @@ def generate_html(data: dict) -> str:
         }
         let filteredChangesForPanel = [];
         let expandedChangeDescriptions = {};
+        let expandedChangeKeys = new Set();
         let expandedGitSummaries = {};
+        let expandedGitKeys = new Set();
         function changeKey(c) {
             return (c.type || '') + '|' + (c.path || c.fromFile || c.oldPath || '') + '|' + (c.toFile || c.newPath || '');
         }
@@ -2393,36 +2362,39 @@ def generate_html(data: dict) -> str:
             const gitListEl = document.getElementById('recent-changes-git-list');
             if (!titleEl || !listEl) return;
             const folderPath = currentPath || '';
-            if (titleEl) titleEl.textContent = folderPath ? 'Changes in this folder' : 'Changes in repo';
+            if (titleEl) titleEl.textContent = 'Changes from Recent Save';
             const changes = lastChangesData.changes || [];
             filteredChangesForPanel = changes.filter(c => isChangeInFolder(c, folderPath));
             if (filteredChangesForPanel.length === 0) {
                 listEl.innerHTML = '';
             } else {
                 listEl.innerHTML = filteredChangesForPanel.map(function(c, i) {
-                    const lineText = formatChangeLine(c).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const mainLine = changeMainLine(c);
                     return '<div class="change-line-with-desc" data-index="' + i + '">' +
-                        '<div class="change-line-text">' + lineText + '</div>' +
-                        '<button type="button" class="change-describe-btn" onclick="describeChange(this)">Describe</button>' +
+                        '<div class="change-line-header">' +
+                        '<span class="change-line-text">' + mainLine + '</span>' +
+                        '<button type="button" class="change-desc-toggle" onclick="describeChange(this)" aria-expanded="false" title="Toggle description">▼</button>' +
+                        '</div>' +
                         '<div class="change-description" style="display:none;"></div></div>';
                 }).join('');
                 filteredChangesForPanel.forEach(function(c, i) {
                     const key = changeKey(c);
+                    if (!expandedChangeKeys.has(key)) return;
                     const stored = expandedChangeDescriptions[key];
-                    if (!stored) return;
                     const row = listEl.children[i];
                     if (!row) return;
                     const descEl = row.querySelector('.change-description');
-                    const btn = row.querySelector('.change-describe-btn');
-                    if (descEl && btn) {
+                    const btn = row.querySelector('.change-desc-toggle');
+                    if (descEl && btn && stored) {
                         descEl.textContent = stored.text;
                         descEl.style.display = 'block';
-                        btn.textContent = 'Hide';
+                        btn.setAttribute('aria-expanded', 'true');
+                        btn.textContent = '▲';
                     }
                 });
             }
             if (gitTitleEl && gitListEl) {
-                gitTitleEl.textContent = folderPath ? 'Previous changes (this folder)' : 'Previous changes (from earlier Cmd+S)';
+                gitTitleEl.textContent = 'Changes from Previous Saves';
                 const batches = lastChangesData.batches || [];
                 const previousBatches = batches.length > 1 ? batches.slice(0, -1).reverse() : [];
                 let previousFlat = [];
@@ -2450,33 +2422,43 @@ def generate_html(data: dict) -> str:
                         const c = item.change;
                         const path = pathFromChange(c);
                         const status = statusFromChange(c);
-                        const label = formatChangeLine(c).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        const mainLine = changeMainLine(c);
                         const batchTs = item.batchTimestamp;
                         const desc = (c.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                        html += '<div class="git-status-line-wrap" data-batch-ts="' + escapeAttr(String(batchTs)) + '">' +
-                            '<div class="git-status-line">' +
-                            '<span class="git-status-badge ' + (status === 'M' ? 'modified' : status === 'A' ? 'added' : status === 'D' ? 'deleted' : 'renamed') + '">' + status + '</span>' +
-                            '<span>' + escapeAttr(label || path) + '</span>' +
-                            '<button type="button" class="git-status-ai-btn" onclick="describeFileChange(this)" data-path="' + escapeAttr(path) + '" data-status="' + status + '" data-batch-ts="' + escapeAttr(String(batchTs)) + '">Describe</button></div>' +
-                            '<div class="git-status-ai-summary" style="display:' + (desc ? 'block' : 'none') + ';">' + desc + '</div></div>';
+                        html += '<div class="change-line-with-desc git-prev-change" data-path="' + escapeAttr(path) + '" data-status="' + escapeAttr(status) + '" data-batch-ts="' + escapeAttr(String(batchTs)) + '">' +
+                            '<div class="change-line-header">' +
+                            '<span class="change-line-text">' + mainLine + '</span>' +
+                            '<button type="button" class="change-desc-toggle" onclick="describeFileChange(this)" aria-expanded="false" data-path="' + escapeAttr(path) + '" data-status="' + escapeAttr(status) + '" data-batch-ts="' + escapeAttr(String(batchTs)) + '" title="Toggle description">▼</button>' +
+                            '</div>' +
+                            '<div class="change-description" style="display:none;">' + desc + '</div></div>';
                     });
                     gitListEl.innerHTML = html;
-                    [].forEach.call(gitListEl.querySelectorAll('.git-status-line-wrap'), function(wrap) {
-                        const btn = wrap.querySelector('.git-status-ai-btn');
-                        const summaryEl = wrap.querySelector('.git-status-ai-summary');
+                    [].forEach.call(gitListEl.querySelectorAll('.change-line-with-desc.git-prev-change'), function(wrap) {
+                        const btn = wrap.querySelector('.change-desc-toggle');
+                        const summaryEl = wrap.querySelector('.change-description');
                         if (!btn || !summaryEl) return;
                         const p = btn.getAttribute('data-path');
                         const bts = btn.getAttribute('data-batch-ts');
                         const cacheKey = p + '::' + (bts || 'latest');
-                        if (p && expandedGitSummaries[cacheKey]) {
-                            summaryEl.textContent = expandedGitSummaries[cacheKey];
+                        if (!expandedGitKeys.has(cacheKey)) return;
+                        const text = expandedGitSummaries[cacheKey] || summaryEl.textContent;
+                        if (text) {
+                            summaryEl.textContent = text;
                             summaryEl.style.display = 'block';
+                            btn.setAttribute('aria-expanded', 'true');
+                            btn.textContent = '▲';
                         }
                     });
                 }
             }
         }
         
+        function updateDescribeBtnState(btn, expanded) {
+            if (btn) {
+                btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                btn.textContent = expanded ? '▲' : '▼';
+            }
+        }
         async function describeChange(btn) {
             const row = btn.closest('.change-line-with-desc');
             if (!row) return;
@@ -2486,23 +2468,26 @@ def generate_html(data: dict) -> str:
             const descEl = row.querySelector('.change-description');
             if (!descEl) return;
             const key = changeKey(change);
-            if (descEl.style.display === 'block' && descEl.textContent && descEl.textContent !== 'Loading…') {
+            const isExpanded = descEl.style.display === 'block';
+            if (isExpanded && descEl.textContent !== 'Loading…') {
                 descEl.style.display = 'none';
                 descEl.textContent = '';
-                btn.textContent = 'Describe';
-                delete expandedChangeDescriptions[key];
+                expandedChangeKeys.delete(key);
+                updateDescribeBtnState(btn, false);
                 return;
             }
+            expandedChangeKeys.add(key);
             const stored = expandedChangeDescriptions[key];
             if (stored) {
                 descEl.textContent = stored.text;
                 descEl.style.display = 'block';
-                btn.textContent = 'Hide';
+                updateDescribeBtnState(btn, true);
                 return;
             }
             btn.disabled = true;
             descEl.style.display = 'block';
             descEl.textContent = 'Loading…';
+            updateDescribeBtnState(btn, true);
             try {
                 const resp = await fetch(window.location.origin + '/api/describe_change', {
                     method: 'POST',
@@ -2513,13 +2498,12 @@ def generate_html(data: dict) -> str:
                 const text = data.description || (data.error ? 'Error: ' + data.error : 'No description.');
                 descEl.textContent = text;
                 expandedChangeDescriptions[key] = { text: text };
-                btn.textContent = 'Hide';
             } catch (e) {
                 descEl.textContent = 'Error: ' + e.message;
                 expandedChangeDescriptions[key] = { text: 'Error: ' + e.message };
-                btn.textContent = 'Hide';
             }
             btn.disabled = false;
+            updateDescribeBtnState(btn, true);
         }
         
         async function describeFileChange(btn) {
@@ -2527,17 +2511,28 @@ def generate_html(data: dict) -> str:
             const status = btn.getAttribute('data-status') || 'M';
             const batchTs = btn.getAttribute('data-batch-ts');
             if (!path) return;
-            const wrap = btn.closest('.git-status-line-wrap');
-            const summaryEl = wrap ? wrap.querySelector('.git-status-ai-summary') : null;
+            const wrap = btn.closest('.change-line-with-desc');
+            const summaryEl = wrap ? wrap.querySelector('.change-description') : null;
             if (!summaryEl) return;
             const cacheKey = path + '::' + (batchTs || 'latest');
+            const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+            if (isExpanded) {
+                summaryEl.style.display = 'none';
+                summaryEl.textContent = '';
+                expandedGitKeys.delete(cacheKey);
+                updateDescribeBtnState(btn, false);
+                return;
+            }
+            expandedGitKeys.add(cacheKey);
             if (expandedGitSummaries[cacheKey]) {
                 summaryEl.textContent = expandedGitSummaries[cacheKey];
                 summaryEl.style.display = 'block';
+                updateDescribeBtnState(btn, true);
                 return;
             }
             summaryEl.style.display = 'block';
             summaryEl.textContent = 'Loading…';
+            updateDescribeBtnState(btn, true);
             btn.disabled = true;
             const body = { path: path, status: status };
             if (batchTs != null && batchTs !== '') body.batchTimestamp = Number(batchTs);
@@ -2557,6 +2552,7 @@ def generate_html(data: dict) -> str:
                 expandedGitSummaries[cacheKey] = errText;
             }
             btn.disabled = false;
+            updateDescribeBtnState(btn, true);
         }
         
         function navigateTo(path, clearPanel) {
@@ -2751,17 +2747,18 @@ def generate_html(data: dict) -> str:
         
         function updateBreadcrumb() {
             const parts = currentPath ? currentPath.split('/') : [];
-            let html = `<span class="breadcrumb-item" onclick="navigateTo('', true)">${graphData.rootName}</span>`;
+            let html = `<span class="breadcrumb-item breadcrumb-folder" onclick="navigateTo('', true)">${graphData.rootName}</span>`;
             
             let accumulated = '';
             for (const part of parts) {
                 accumulated += (accumulated ? '/' : '') + part;
                 const p = accumulated;
                 html += `<span class="breadcrumb-sep">/</span>`;
-                html += `<span class="breadcrumb-item" onclick="navigateTo('${p}', true)">${escapeAttr(part)}</span>`;
+                html += `<span class="breadcrumb-item breadcrumb-folder" onclick="navigateTo('${p}', true)">${escapeAttr(part)}</span>`;
             }
             if (selectedNode && selectedNode.type !== 'folder') {
-                html += `<span class="breadcrumb-sep">/</span><span class="breadcrumb-file">${escapeAttr(selectedNode.name)}</span>`;
+                const fileColor = getNodeColor(selectedNode);
+                html += `<span class="breadcrumb-sep">/</span><span class="breadcrumb-file" style="color:${fileColor}">${escapeAttr(selectedNode.name)}</span>`;
             }
             
             document.getElementById('breadcrumb').innerHTML = html;
@@ -2875,7 +2872,7 @@ def generate_html(data: dict) -> str:
                 .attr('cx', containerCenterX)
                 .attr('cy', containerCenterY)
                 .attr('r', hierarchy.r)
-                .attr('fill', '#374151')
+                .attr('fill', '#6b7280')
                 .attr('stroke', '#111')
                 .attr('stroke-width', 2)
                 .style('cursor', 'pointer')
@@ -2948,7 +2945,7 @@ def generate_html(data: dict) -> str:
                     const overlay = d3.select(this).append('g').attr('class', 'folder-preview-overlay').attr('clip-path', 'url(#' + clipId + ')');
                     hierarchy.children.forEach(c => {
                         const nd = c.data;
-                        const fill = nd.type === 'folder' ? '#374151' : getNodeColor(nd);
+                        const fill = nd.type === 'folder' ? '#6b7280' : getNodeColor(nd);
                         overlay.append('circle')
                             .attr('class', 'folder-preview-dot')
                             .attr('cx', c.x - center)
@@ -2966,7 +2963,7 @@ def generate_html(data: dict) -> str:
             
             node.append('circle')
                 .attr('r', d => d.r)
-                .attr('fill', d => d.type === 'folder' ? '#374151' : getNodeColor(d))
+                .attr('fill', d => d.type === 'folder' ? '#6b7280' : getNodeColor(d))
                 .attr('stroke', d => d.type === 'folder' ? '#111' : (d3.color(getNodeColor(d))?.darker(0.5) || '#333'));
             
             // Folder and file labels: inside circle, 12px, truncated to fit
@@ -3514,7 +3511,7 @@ def generate_html(data: dict) -> str:
                 if (hierarchy.children) {
                     hierarchy.children.forEach(c => {
                         const nd = c.data;
-                        const fill = nd.type === 'folder' ? '#374151' : getNodeColor(nd);
+                        const fill = nd.type === 'folder' ? '#6b7280' : getNodeColor(nd);
                         overlay.append('circle')
                             .attr('class', 'folder-preview-dot')
                             .attr('cx', c.x - center)
@@ -3675,16 +3672,30 @@ def generate_html(data: dict) -> str:
                     
                     return sourceId === sid || targetId === sid;
                 })
-                .classed('inbound', d => isFileSelected && (typeof d.target === 'object' && d.target !== null ? d.target.id : d.target) === sid)
-                .classed('outbound', d => isFileSelected && (typeof d.source === 'object' && d.source !== null ? d.source.id : d.source) === sid)
+                .classed('inbound', d => {
+                    if (!isFileSelected || !sid) return false;
+                    const targetVal = typeof d.target === 'object' && d.target !== null ? (d.target.id || d.target.path) : d.target;
+                    const sourceVal = typeof d.source === 'object' && d.source !== null ? (d.source.id || d.source.path) : d.source;
+                    const targetMatches = (targetVal === sid || (d.target && (d.target.path || d.target.id) === sid));
+                    const sourceMatches = (sourceVal === sid || (d.source && (d.source.path || d.source.id) === sid));
+                    return targetMatches && !sourceMatches;
+                })
+                .classed('outbound', d => {
+                    if (!isFileSelected || !sid) return false;
+                    const sourceVal = typeof d.source === 'object' && d.source !== null ? (d.source.id || d.source.path) : d.source;
+                    const targetVal = typeof d.target === 'object' && d.target !== null ? (d.target.id || d.target.path) : d.target;
+                    const sourceMatches = (sourceVal === sid || (d.source && (d.source.path || d.source.id) === sid));
+                    const targetMatches = (targetVal === sid || (d.target && (d.target.path || d.target.id) === sid));
+                    return sourceMatches && !targetMatches;
+                })
                 .classed('dep-arrow', isFileSelected)
                 .attr('marker-end', d => {
                     if (!isFileSelected) return 'url(#arrowhead)';
-                    const sourceId = typeof d.source === 'object' && d.source !== null ? d.source.id : d.source;
-                    const targetId = typeof d.target === 'object' && d.target !== null ? d.target.id : d.target;
-                    if (targetId === sid) return 'url(#arrowhead-inbound)';
-                    if (sourceId === sid) return 'url(#arrowhead-outbound)';
-                    return 'url(#arrowhead)';
+                    const sourceId = typeof d.source === 'object' && d.source !== null ? (d.source.id || d.source.path) : d.source;
+                    const targetId = typeof d.target === 'object' && d.target !== null ? (d.target.id || d.target.path) : d.target;
+                    if (targetId === sid || (d.target && d.target.path === sid)) return 'url(#arrowhead-inbound)';
+                    if (sourceId === sid || (d.source && d.source.path === sid)) return 'url(#arrowhead-outbound)';
+                    return 'url(#arrowhead-outbound)';
                 });
             
             // Show cross-level dependencies - either as direct connections or external nodes
@@ -4035,17 +4046,17 @@ def generate_html(data: dict) -> str:
                                 const endY = targetY - (dy/dist) * targetR;
                                 
                                 // Draw arrow from selected node to target node in layer
-                                // Use purple to distinguish cross-level connections
+                                // Outbound cross-level: orange (same as same-level outbound)
                                 const linkGroup = g.append('g').attr('class', 'link-cross-level');
                                 linkGroup.append('line')
                                     .attr('x1', startX)
                                     .attr('y1', startY)
                                     .attr('x2', endX)
                                     .attr('y2', endY)
-                                    .attr('stroke', '#a855f7')
+                                    .attr('stroke', '#f59e0b')
                                     .attr('stroke-width', 2)
                                     .attr('stroke-dasharray', '8 8')
-                                    .attr('marker-end', 'url(#arrowhead-cross-level)')
+                                    .attr('marker-end', 'url(#arrowhead-outbound)')
                                     .attr('class', 'link cross-level dep-arrow visible')
                                     .style('cursor', 'pointer')
                                     .style('opacity', 1)
@@ -4089,18 +4100,16 @@ def generate_html(data: dict) -> str:
                                 const endX = outsideX - (dx/dist) * nodeRadius;
                                 const endY = outsideY - (dy/dist) * nodeRadius;
                                 
-                                // Draw arrow from selected node to outside node
-                                // Use selected node's color for outbound dependencies
-                                const arrowheadMarker = getOrCreateColoredArrowhead(selectedNodeColor);
+                                // Draw arrow from selected node to outside node (outbound = orange)
                                 const linkGroup = g.append('g').attr('class', 'link-cross-level');
                                 linkGroup.append('line')
                                     .attr('x1', startX)
                                     .attr('y1', startY)
                                     .attr('x2', endX)
                                     .attr('y2', endY)
-                                    .attr('stroke', selectedNodeColor)
+                                    .attr('stroke', '#f59e0b')
                                     .attr('stroke-width', 2)
-                                    .attr('marker-end', arrowheadMarker)
+                                    .attr('marker-end', 'url(#arrowhead-outbound)')
                                     .attr('class', 'link cross-level dep-arrow visible')
                                     .style('cursor', 'pointer')
                                     .on('click', function(event) {
@@ -4118,7 +4127,7 @@ def generate_html(data: dict) -> str:
                                     });
                                 
                                 // Use selected node's color for external node
-                                const nodeColor = depNode.type === 'folder' ? '#374151' : selectedNodeColor;
+                                const nodeColor = depNode.type === 'folder' ? '#6b7280' : selectedNodeColor;
                                 const strokeColor = depNode.type === 'folder' ? '#111' : (d3.color(selectedNodeColor)?.darker(0.5) || '#333');
                                 outsideNodeGroup.append('circle')
                                     .attr('cx', outsideX)
@@ -4359,16 +4368,17 @@ def generate_html(data: dict) -> str:
                                 const endX = selectedX - (dx/dist) * selectedR;
                                 const endY = selectedY - (dy/dist) * selectedR;
                                 
+                                // Inbound cross-level: green (same as same-level inbound)
                                 const linkGroup = g.append('g').attr('class', 'link-cross-level');
                                 linkGroup.append('line')
                                     .attr('x1', startX)
                                     .attr('y1', startY)
                                     .attr('x2', endX)
                                     .attr('y2', endY)
-                                    .attr('stroke', '#a855f7')
+                                    .attr('stroke', '#22c55e')
                                     .attr('stroke-width', 2)
                                     .attr('stroke-dasharray', '8 8')
-                                    .attr('marker-end', 'url(#arrowhead-cross-level)')
+                                    .attr('marker-end', 'url(#arrowhead-inbound)')
                                     .attr('class', 'link cross-level dep-arrow visible')
                                     .style('cursor', 'pointer')
                                     .style('opacity', 1)
@@ -4411,16 +4421,16 @@ def generate_html(data: dict) -> str:
                                 const endX = selectedX - (dx/dist) * selectedR;
                                 const endY = selectedY - (dy/dist) * selectedR;
                                 
-                                const arrowheadMarker = getOrCreateColoredArrowhead(depNodeColor);
+                                // Arrow from outside node to selected (inbound = green)
                                 const linkGroup = g.append('g').attr('class', 'link-cross-level');
                                 linkGroup.append('line')
                                     .attr('x1', startX)
                                     .attr('y1', startY)
                                     .attr('x2', endX)
                                     .attr('y2', endY)
-                                    .attr('stroke', depNodeColor)
+                                    .attr('stroke', '#22c55e')
                                     .attr('stroke-width', 2)
-                                    .attr('marker-end', arrowheadMarker)
+                                    .attr('marker-end', 'url(#arrowhead-inbound)')
                                     .attr('class', 'link cross-level dep-arrow visible')
                                     .style('cursor', 'pointer')
                                     .on('click', function(event) {
@@ -4436,7 +4446,7 @@ def generate_html(data: dict) -> str:
                                         focusFile(depPath);
                                     });
                                 
-                                const nodeColor = depNode.type === 'folder' ? '#374151' : depNodeColor;
+                                const nodeColor = depNode.type === 'folder' ? '#6b7280' : depNodeColor;
                                 const strokeColor = depNode.type === 'folder' ? '#111' : (d3.color(depNodeColor)?.darker(0.5) || '#333');
                                 outsideNodeGroup.append('circle')
                                     .attr('cx', outsideX)
@@ -4585,21 +4595,20 @@ def generate_html(data: dict) -> str:
                             <button type="button" class="card-remove" onclick="clearSelection()" aria-label="Clear">×</button>
                         </div>
                         <div class="file-info">
-                            <div class="file-name"><svg class="sidebar-icon" viewBox="0 0 24 24"><use href="#folder-icon"/></svg><span>${esc(node.name)}</span></div>
-                            <div class="file-path">${esc(node.path || '/')}</div>
+                            <div class="file-name file-name-folder"><svg class="sidebar-icon" viewBox="0 0 24 24"><use href="#folder-icon"/></svg><span>${esc(node.name)}</span></div>
                             <div class="folder-count-toggle">
                                 <button type="button" class="${folderCountMode === 'direct' ? 'active' : ''}" onclick="setFolderCountMode('direct')">Direct</button>
                                 <button type="button" class="${folderCountMode === 'recursive' ? 'active' : ''}" onclick="setFolderCountMode('recursive')">Recursive</button>
                             </div>
                             <div class="file-meta">
                                 <div class="meta-item">
-                                    <div class="meta-label" style="color:#7c3aed">Subfolders</div>
-                                    <div class="meta-value" style="color:#7c3aed">${folderCountMode === 'direct' ? (node.subfolderCount ?? 0) : (node.recursiveSubfolderCount ?? 0)}</div>
+                                    <div class="meta-label">Subfolders</div>
+                                    <div class="meta-value">${folderCountMode === 'direct' ? (node.subfolderCount ?? 0) : (node.recursiveSubfolderCount ?? 0)}</div>
                                 </div>
                                 ${(node.fileCount ?? 0) > 0 ? `
                                 <div class="meta-item">
-                                    <div class="meta-label" style="color:#06b6d4">Files</div>
-                                    <div class="meta-value" style="color:#06b6d4">${folderCountMode === 'direct' ? (node.directFileCount ?? 0) : (node.fileCount ?? 0)}</div>
+                                    <div class="meta-label">Files</div>
+                                    <div class="meta-value">${folderCountMode === 'direct' ? (node.directFileCount ?? 0) : (node.fileCount ?? 0)}</div>
                                 </div>
                                 ` : ''}
                             </div>
@@ -4611,6 +4620,7 @@ def generate_html(data: dict) -> str:
             const dependencies = node.dependencies || [];
             const imports = node.imports || [];
             const currentFolderPath = (node.path || '').split('/').slice(0, -1).join('/');
+            const fileColor = getNodeColor(node);
             return `
                 <div class="sidebar-section" data-node-id="${esc(node.id)}">
                     <div class="sidebar-title">
@@ -4619,15 +4629,14 @@ def generate_html(data: dict) -> str:
                     </div>
                     <div class="file-info">
                         <div class="file-name"><svg class="sidebar-icon" viewBox="0 0 24 24"><use href="#file-icon"/></svg><span>${esc(node.name)}</span></div>
-                        <div class="file-path">${esc(node.path)}</div>
                         <div class="file-meta">
                             <div class="meta-item">
                                 <div class="meta-label">Language</div>
-                                <div class="meta-value file">${esc(node.language || '')}</div>
+                                <div class="meta-value file" style="color:${fileColor}">${esc(node.language || '')}</div>
                             </div>
                             <div class="meta-item">
                                 <div class="meta-label">Lines</div>
-                                <div class="meta-value file">${node.loc != null ? node.loc.toLocaleString() : 0}</div>
+                                <div class="meta-value file" style="color:${fileColor}">${node.loc != null ? node.loc.toLocaleString() : 0}</div>
                             </div>
                         </div>
                         ${dependents.length > 0 ? `
@@ -4713,6 +4722,7 @@ def generate_html(data: dict) -> str:
 
         var filePanelOpen = false;
         var changesPanelOpen = false;
+        var searchPanelOpen = false;
         function setFilePanelOpen(open) {
             filePanelOpen = !!open;
             var el = document.getElementById('file-info-panel');
@@ -4727,8 +4737,22 @@ def generate_html(data: dict) -> str:
             if (el) el.classList.toggle('open', changesPanelOpen);
             if (btn) btn.classList.toggle('active', changesPanelOpen);
         }
+        function setSearchPanelOpen(open) {
+            searchPanelOpen = !!open;
+            var el = document.getElementById('search-panel');
+            var btn = document.getElementById('panel-toggle-search-btn');
+            if (el) el.classList.toggle('open', searchPanelOpen);
+            if (btn) btn.classList.toggle('active', searchPanelOpen);
+            if (open) {
+                setTimeout(function() {
+                    var input = document.getElementById('search-input');
+                    if (input) input.focus();
+                }, 100);
+            }
+        }
         function openFilePanel() {
             setChangesPanelOpen(false);
+            setSearchPanelOpen(false);
             setFilePanelOpen(true);
         }
         function closeFilePanel() {
@@ -4736,18 +4760,31 @@ def generate_html(data: dict) -> str:
         }
         function openChangesPanel() {
             setFilePanelOpen(false);
+            setSearchPanelOpen(false);
             setChangesPanelOpen(true);
         }
         function closeChangesPanel() {
             setChangesPanelOpen(false);
         }
+        function openSearchPanel() {
+            setFilePanelOpen(false);
+            setChangesPanelOpen(false);
+            setSearchPanelOpen(true);
+        }
+        function closeSearchPanel() {
+            setSearchPanelOpen(false);
+        }
         var filePanelBtn = document.getElementById('panel-toggle-file-btn');
         var changesPanelBtn = document.getElementById('panel-toggle-changes-btn');
+        var searchPanelBtn = document.getElementById('panel-toggle-search-btn');
         if (filePanelBtn) filePanelBtn.addEventListener('click', function() {
             if (filePanelOpen) closeFilePanel(); else openFilePanel();
         });
         if (changesPanelBtn) changesPanelBtn.addEventListener('click', function() {
             if (changesPanelOpen) closeChangesPanel(); else openChangesPanel();
+        });
+        if (searchPanelBtn) searchPanelBtn.addEventListener('click', function() {
+            if (searchPanelOpen) closeSearchPanel(); else openSearchPanel();
         });
 
         const detailsPanel = document.getElementById('details-panel');
@@ -4821,6 +4858,27 @@ def generate_html(data: dict) -> str:
         updateChangesInFolderPanel();
 
         // Recent changes — poll and update graph/panel
+        function humanChangeType(t, kind) {
+            const s = (t || '').toLowerCase();
+            if (s === 'file_body_edited') return 'File edited';
+            if (s === 'file_added') return 'File added';
+            if (s === 'file_deleted') return 'File deleted';
+            if (s === 'folder_added') return 'Folder added';
+            if (s === 'folder_deleted') return 'Folder deleted';
+            if (s === 'path_changed') return (kind === 'renamed') ? 'File renamed' : 'File moved';
+            if (s === 'folder_path_changed') return (kind === 'renamed') ? 'Folder renamed' : 'Folder moved';
+            if (s === 'import_added') return 'Import added';
+            if (s === 'import_removed') return 'Import removed';
+            return (t || 'Change').replace(/_/g, ' ').replace(/\\b\\w/g, function(ch) { return ch.toUpperCase(); });
+        }
+        function changeMainLine(c) {
+            const typeLabel = humanChangeType(c ? c.type : '', c ? c.kind : undefined);
+            const esc = function(x) { return (x || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+            if (c.path) return typeLabel + ' · ' + esc(c.path);
+            if (c.oldPath != null && c.newPath != null) return typeLabel + ' · ' + esc(c.oldPath) + ' → ' + esc(c.newPath);
+            if (c.fromFile != null && c.toFile != null) return typeLabel + ' · ' + esc(c.fromFile) + ' → ' + esc(c.toFile);
+            return typeLabel;
+        }
         function formatChangeLine(c) {
             const k = c.kind ? ' (' + c.kind + ')' : '';
             if (c.path !== undefined) return c.type + ': ' + c.path + k;
@@ -4853,7 +4911,19 @@ def generate_html(data: dict) -> str:
                 lastChangesData.changes = changes;
                 lastChangesData.lastSendTimestamp = ts;
                 lastChangesData.batches = batches;
-                lastEl.textContent = 'Last Cmd+S: ' + (ts == null ? 'Never' : new Date(ts).toISOString());
+                if (ts == null) {
+                    lastEl.textContent = '—';
+                    lastEl.className = 'last-save-box';
+                } else {
+                    const minAgo = (Date.now() - ts) / 60000;
+                    if (minAgo < 1) {
+                        lastEl.textContent = 'Last save <1 min ago';
+                        lastEl.className = 'last-save-box recent';
+                    } else {
+                        lastEl.textContent = 'Last save ' + Math.floor(minAgo) + ' min ago';
+                        lastEl.className = 'last-save-box';
+                    }
+                }
                 updateChangesInFolderPanel();
                 if (ts !== lastSeenSendTimestamp) {
                     lastSeenSendTimestamp = ts;
@@ -4868,22 +4938,12 @@ def generate_html(data: dict) -> str:
                                     updateGraphData(data);
                                     return;
                                 }
-                                var pathInput = document.getElementById('load-repo-path');
-                                if (!pathInput) return;
-                                var pathToLoad = pathInput.value.trim();
-                                if (pathToLoad) {
-                                    loadRepo();
-                                } else {
-                                    fetch(window.location.origin + '/api/initial_path')
-                                        .then(function(r2) { return r2.ok ? r2.json() : null; })
-                                        .then(function(ip) {
-                                            if (ip && ip.path && pathInput) {
-                                                pathInput.value = ip.path;
-                                                loadRepo();
-                                            }
-                                        })
-                                        .catch(function() {});
-                                }
+                                fetch(window.location.origin + '/api/initial_path')
+                                    .then(function(r2) { return r2.ok ? r2.json() : null; })
+                                    .then(function(ip) {
+                                        if (ip && ip.path) loadRepo(ip.path);
+                                    })
+                                    .catch(function() {});
                             })
                             .catch(function() {});
                 }
