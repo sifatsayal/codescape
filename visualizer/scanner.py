@@ -3,7 +3,6 @@ Repository scanner module.
 
 Scans a target repository and extracts file/folder structure.
 """
-
 from pathlib import Path
 from typing import Dict, Optional
 from collections import defaultdict
