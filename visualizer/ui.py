@@ -2311,7 +2311,6 @@ def generate_html(data: dict) -> str:
                 });
             }
             if (gitTitleEl && gitListEl) {
-                gitTitleEl.textContent = 'Changes from Previous Saves';
                 const batches = lastChangesData.batches || [];
                 const previousBatches = batches.length > 1 ? batches.slice(0, -1).reverse() : [];
                 let previousFlat = [];
@@ -2321,6 +2320,8 @@ def generate_html(data: dict) -> str:
                         if (isChangeInFolder(c, folderPath)) previousFlat.push({ change: c, batchTimestamp: ts });
                     });
                 });
+                const totalLabel = previousFlat.length === 1 ? '1 change' : previousFlat.length + ' changes';
+                gitTitleEl.textContent = 'Changes from Previous Saves · ' + totalLabel;
                 if (previousFlat.length === 0) {
                     gitListEl.innerHTML = '<div class="recent-changes-muted">No previous changes yet. Save with Cmd+S to build history.</div>';
                 } else {
