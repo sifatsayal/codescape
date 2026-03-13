@@ -73,6 +73,41 @@ def _git_status_paths(repo_path):
         return {"modified": [], "added": [], "deleted": [], "renamed": []}
 
 
+def _git_diff_line_stats(repo_path):
+    """Return (additions, deletions) for repo working tree vs HEAD, or (0, 0) on error."""
+    repo_path = Path(repo_path).resolve()
+    if not repo_path.is_dir():
+        return (0, 0)
+    try:
+        result = subprocess.run(
+            ["git", "diff", "HEAD", "--numstat"],
+            cwd=str(repo_path),
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if result.returncode != 0 or not result.stdout:
+            return (0, 0)
+        total_add = 0
+        total_del = 0
+        for line in result.stdout.strip().splitlines():
+            parts = line.split(None, 2)
+            if len(parts) >= 2:
+                try:
+                    add = int(parts[0]) if parts[0] != "-" else 0
+                    total_add += add
+                except ValueError:
+                    pass
+                try:
+                    dele = int(parts[1]) if parts[1] != "-" else 0
+                    total_del += dele
+                except ValueError:
+                    pass
+        return (total_add, total_del)
+    except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
+        return (0, 0)
+
+
 def _git_diff_for_path(repo_path, relative_path):
     """Return git diff (working tree vs HEAD) for one file, or None."""
     repo_path = Path(repo_path).resolve()
@@ -527,10 +562,13 @@ def create_handler(html_content, load_repo_callback=None, initial_repo_path=None
                         out.append(c)
                     return {'timestamp': ts, 'changes': out}
                 batches_for_client = [enrich_batch(b) for b in change_batches]
+                line_add, line_del = _git_diff_line_stats(repo) if repo else (0, 0)
                 self._send_json(200, {
                     'lastSendTimestamp': last_send_timestamp,
                     'changes': list(last_changes),
                     'batches': batches_for_client,
+                    'linesAdded': line_add,
+                    'linesDeleted': line_del,
                 })
                 return
             if parsed.path == '/api/initial_path':

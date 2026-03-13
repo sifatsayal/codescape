@@ -562,6 +562,26 @@ def generate_html(data: dict) -> str:
         .recent-changes-git-section .recent-changes-title {
             margin-bottom: 6px;
         }
+        .recent-changes-git-stats {
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+        }
+        .recent-changes-git-stats .stat-file-count {
+            color: #9ca3af;
+        }
+        .recent-changes-git-stats .lines-added {
+            color: #22c55e;
+            font-weight: 600;
+        }
+        .recent-changes-git-stats .lines-deleted {
+            color: #ef4444;
+            font-weight: 600;
+        }
         .git-status-line {
             font-size: 12px;
             font-family: 'JetBrains Mono', monospace;
@@ -1813,6 +1833,7 @@ def generate_html(data: dict) -> str:
                     <div id="recent-changes-list" class="recent-changes-list"></div>
                     <div id="recent-changes-git-section" class="recent-changes-git-section">
                         <div id="recent-changes-git-title" class="recent-changes-title">Changes from Previous Saves</div>
+                        <div id="recent-changes-git-stats" class="recent-changes-git-stats" aria-live="polite"></div>
                         <div id="recent-changes-git-list" class="recent-changes-list"></div>
                     </div>
                 </div>
@@ -1927,7 +1948,7 @@ def generate_html(data: dict) -> str:
         let folderCountMode = 'direct';  // 'direct' | 'recursive'
         let selectionHistory = [];
         let historyIndex = -1;
-        let lastChangesData = { lastSendTimestamp: null, changes: [], batches: [] };
+        let lastChangesData = { lastSendTimestamp: null, changes: [], batches: [], linesAdded: 0, linesDeleted: 0 };
         let gitStatusData = { modified: [], added: [], deleted: [], renamed: [] };
 
         const FOLDER_COLOR = '#6b7280';
@@ -2320,8 +2341,18 @@ def generate_html(data: dict) -> str:
                         if (isChangeInFolder(c, folderPath)) previousFlat.push({ change: c, batchTimestamp: ts });
                     });
                 });
-                const totalLabel = previousFlat.length === 1 ? '1 change' : previousFlat.length + ' changes';
+                const totalLabel = previousFlat.length === 1 ? '1 Total Change' : previousFlat.length + ' Total Changes';
                 gitTitleEl.textContent = 'Changes from Previous Saves · ' + totalLabel;
+                const gitStatsEl = document.getElementById('recent-changes-git-stats');
+                if (gitStatsEl) {
+                    const fileCount = previousFlat.length;
+                    const linesAdded = typeof lastChangesData.linesAdded === 'number' ? lastChangesData.linesAdded : 0;
+                    const linesDeleted = typeof lastChangesData.linesDeleted === 'number' ? lastChangesData.linesDeleted : 0;
+                    const fileCountText = fileCount === 1 ? '1 file change' : fileCount + ' file changes';
+                    gitStatsEl.innerHTML = '<span class="stat-file-count">' + fileCountText + '</span>' +
+                        '<span class="lines-added">+' + linesAdded + '</span>' +
+                        '<span class="lines-deleted">-' + linesDeleted + '</span>';
+                }
                 if (previousFlat.length === 0) {
                     gitListEl.innerHTML = '<div class="recent-changes-muted">No previous changes yet. Save with Cmd+S to build history.</div>';
                 } else {
@@ -4886,6 +4917,8 @@ def generate_html(data: dict) -> str:
                 lastChangesData.changes = changes;
                 lastChangesData.lastSendTimestamp = ts;
                 lastChangesData.batches = batches;
+                lastChangesData.linesAdded = typeof data.linesAdded === 'number' ? data.linesAdded : 0;
+                lastChangesData.linesDeleted = typeof data.linesDeleted === 'number' ? data.linesDeleted : 0;
                 if (ts == null) {
                     lastEl.textContent = '—';
                     lastEl.className = 'last-save-box';
