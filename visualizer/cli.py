@@ -191,16 +191,19 @@ Examples:
     else:
         port = find_available_port(8000)
         if port is None:
-            print("❌ Error: No available port found (tried 8000–8019). Stop other services using these ports.")
+            print("❌ Error: No available port found (tried 8000–8099). Try: python3 visualize_codebase.py --port 8080")
             return 1
         if port != 8000:
             print(f"   Port 8000 in use, using port {port} instead.")
     
-    # Start server with load-repo API so the UI can load another repo
+    # Start server with load-repo API and initial repo path for rescan
     server_thread = threading.Thread(
         target=start_server,
         args=(html, port),
-        kwargs={"load_repo_callback": build_graph_data_for_path},
+        kwargs={
+            "load_repo_callback": build_graph_data_for_path,
+            "initial_repo_path": str(repo_path),
+        },
         daemon=True,
     )
     server_thread.start()

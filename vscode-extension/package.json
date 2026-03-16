@@ -11,7 +11,8 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:codebaseVisualizer.visualize"
+    "onCommand:codebaseVisualizer.visualize",
+    "onCommand:codebaseVisualizer.visualizeEmbedded"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -22,7 +23,7 @@
         "category": "Codebase Visualizer"
       },
       {
-        "command": "codebaseVisualizer.visualizeInPanel",
+        "command": "codebaseVisualizer.visualizeEmbedded",
         "title": "Visualize Codebase (Embedded)",
         "category": "Codebase Visualizer"
       }
@@ -33,12 +34,22 @@
         "codebaseVisualizer.pythonPath": {
           "type": "string",
           "default": "python3",
-          "description": "Path to Python executable (python3, python, or full path)"
+          "description": "Path to python executable used to run the codebase visualizer."
         },
         "codebaseVisualizer.autoOpen": {
           "type": "boolean",
           "default": true,
           "description": "Automatically open browser when visualization is ready"
+        },
+        "codebaseVisualizer.visualizerRepoPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the visualizer repo (win26-Team22) if not pip-installed. Leave empty if you ran 'pip install -e .' from that repo."
+        },
+        "codebaseVisualizer.openaiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "OpenAI API key for AI-powered features (e.g. hover file summaries). Passed to the visualizer as OPENAI_API_KEY. Leave empty to use the OPENAI_API_KEY environment variable if set."
         }
       }
     }
@@ -53,5 +64,18 @@
     "@types/vscode": "^1.74.0",
     "typescript": "^5.0.0"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "publisher": "win26-team22",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/StanfordCS194/win26-Team22"
+  },
+  "license": "MIT",
+  "keywords": [
+    "visualization",
+    "dependencies",
+    "codebase",
+    "graph",
+    "architecture"
+  ]
 }
